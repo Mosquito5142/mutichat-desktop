@@ -16,11 +16,12 @@
 
 ---
 
-## 🛠️ ความต้องการของระบบ (Requirements)
+## 🛠️ สิ่งที่ต้องติดตั้งก่อน Build (Prerequisites & Download Links)
 
-- **Node.js:** v18.0.0 ขึ้นไป (แนะนำ v20 หรือ v22)
-- **npm:** v9.0.0 ขึ้นไป
-- **OS:** Windows 10 / 11 (x64)
+ก่อนรันหรือ Build โปรแกรม ต้องติดตั้งโปรแกรมล่วงหน้าดังนี้:
+
+1. 🟢 **Node.js (v18 ขึ้นไป):** [ดาวน์โหลดที่ nodejs.org](https://nodejs.org/) *(เลือกเวอร์ชัน LTS)*
+2. 🐙 **Git:** [ดาวน์โหลดที่ git-scm.com](https://git-scm.com/)
 
 ---
 
