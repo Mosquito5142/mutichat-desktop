@@ -1,0 +1,799 @@
+/* Reset & Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Utility: Hidden — use on non-modal elements only */
+.hidden {
+  display: none !important;
+}
+
+body {
+  background-color: #0b0f19;
+  color: #f8fafc;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Top Bar Styling */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111827;
+  border-bottom: 1px solid #1f2937;
+  padding: 0 12px;
+  height: 44px;
+  min-height: 44px;
+  user-select: none;
+  position: relative;
+  z-index: 100;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #0084ff, #a435f0);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.1;
+  background: linear-gradient(90deg, #60a5fa, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-subtitle {
+  font-size: 9px;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+/* Accounts Section in Header */
+.accounts-header-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.btn-add-acc {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-add-acc:hover {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  transform: translateY(-1px);
+}
+
+.account-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+
+.account-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.acc-tab {
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #9ca3af;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.acc-tab:hover {
+  background: #374151;
+  color: #f3f4f6;
+}
+
+.acc-tab.active {
+  background: #3b82f6;
+  border-color: #60a5fa;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.acc-tab .unread-badge {
+  background: #ef4444;
+  color: white;
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+/* Grid Layout for Dynamic Accounts — single row of equal-width columns, never wraps */
+.chat-container.mode-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+  background: #111827;
+  overflow-x: hidden;
+}
+
+/* Each pane stretches to fill full height, shares width equally */
+.chat-container.mode-grid .chat-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+}
+
+.chat-container.single-pane .chat-pane {
+  display: none !important;
+}
+
+.chat-container.single-pane .chat-pane.active-pane {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.pane-btn.danger:hover {
+  background: #ef4444;
+  color: white;
+}
+
+/* Top Actions — icon-only buttons with tooltip on hover */
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #e5e7eb;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  position: relative;
+}
+
+/* Hide text labels, show only icons — keep text accessible via title attribute */
+.action-btn span {
+  display: none;
+}
+
+.action-btn:hover {
+  background: #374151;
+  color: #ffffff;
+}
+
+/* Tooltip on hover using title — shown via CSS pseudo-element */
+.action-btn::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #f1f5f9;
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 9999;
+}
+
+.action-btn:hover::after {
+  opacity: 1;
+}
+
+.action-btn.highlight {
+  background: linear-gradient(135deg, #059669, #10b981);
+  border: none;
+  color: white;
+  padding: 5px 10px;
+}
+
+.action-btn.highlight:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.action-btn.active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+/* Main Layout & Webviews Container */
+.main-content {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 44px);
+  position: relative;
+  overflow: hidden;
+}
+
+.chat-container {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  background: #0f172a;
+  transition: flex 0.3s ease, width 0.3s ease;
+}
+
+/* Splitter */
+.pane-splitter {
+  width: 4px;
+  background: #1e293b;
+  height: 100%;
+}
+
+/* Mode Adjustments */
+.chat-container.mode-acc1 #pane-acc2,
+.chat-container.mode-acc1 .pane-splitter {
+  display: none !important;
+}
+
+.chat-container.mode-acc2 #pane-acc1,
+.chat-container.mode-acc2 .pane-splitter {
+  display: none !important;
+}
+
+/* Pane Headers */
+.pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  height: 38px;
+  background: #111827;
+  border-bottom: 1px solid #1f2937;
+  gap: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.acc1-header {
+  border-left: 3px solid #3b82f6;
+}
+
+.acc2-header {
+  border-left: 3px solid #a855f7;
+}
+
+.acc-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Drag handle icon shown at left of pane header */
+.drag-handle {
+  color: #4b5563;
+  font-size: 12px;
+  cursor: grab;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.drag-handle:hover { color: #9ca3af; }
+
+/* Visual while dragging this pane */
+.chat-pane.dragging {
+  opacity: 0.45;
+  outline: 2px dashed #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Visual when another pane is dragged over this one */
+.chat-pane.drag-over {
+  outline: 2px solid #10b981;
+  outline-offset: -2px;
+  background: rgba(16, 185, 129, 0.06);
+}
+
+/* Pane header cursor while hovering drag handle */
+.pane-header[draggable="true"] { cursor: default; }
+
+.acc-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+  flex-shrink: 0;
+}
+
+.acc1-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.acc2-badge {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.acc-status {
+  font-size: 10px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.acc-status.loading {
+  color: #f59e0b;
+}
+
+.acc-status.ready {
+  color: #10b981;
+}
+
+.pane-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.pane-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.pane-btn:hover {
+  background: #1f2937;
+  color: #ffffff;
+}
+
+/* Webview Wrapper */
+.webview-wrapper {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 40px);
+  position: relative;
+  background: #000;
+}
+
+webview {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Seller Sidebar Drawer */
+.seller-sidebar {
+  width: 320px;
+  height: 100%;
+  background: #111827;
+  border-left: 1px solid #1f2937;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.5);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+}
+
+.seller-sidebar.open {
+  transform: translateX(0);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.sidebar-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-warning {
+  color: #f59e0b;
+}
+
+.close-sidebar-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.close-sidebar-btn:hover {
+  color: #ffffff;
+}
+
+.sidebar-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.sidebar-actions {
+  margin-bottom: 12px;
+}
+
+.add-snippet-btn {
+  width: 100%;
+  background: #1f2937;
+  border: 1px dashed #4b5563;
+  color: #60a5fa;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.add-snippet-btn:hover {
+  background: #374151;
+  border-color: #60a5fa;
+}
+
+/* Snippets List & Cards */
+.snippet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.snippet-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: all 0.2s ease;
+}
+
+.snippet-card:hover {
+  border-color: #4b5563;
+  transform: translateY(-1px);
+}
+
+.snippet-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.snippet-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.snippet-tag.bank {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.snippet-tag.welcome {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.snippet-tag.shipping {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.snippet-tag.info {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.snippet-tag.custom {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f472b6;
+}
+
+.copy-btn {
+  background: #374151;
+  border: none;
+  color: #e5e7eb;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  background: #2563eb;
+  color: white;
+}
+
+.snippet-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f3f4f6;
+  margin-bottom: 4px;
+}
+
+.snippet-preview {
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Modal Styles — z-index 9999 ensures modal renders above Electron WebView native layer */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 1;
+  pointer-events: all;
+  transition: opacity 0.2s ease;
+}
+
+.modal-overlay.hidden {
+  display: none !important;
+}
+
+.modal-box {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  padding: 18px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.modal-header h4 {
+  font-size: 15px;
+  color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.form-group {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 12px;
+  color: #d1d5db;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  border-color: #3b82f6;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.btn-secondary {
+  background: #374151;
+  border: none;
+  color: #d1d5db;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: #2563eb;
+  border: none;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+
+.toast {
+  background: #10b981;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideIn 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

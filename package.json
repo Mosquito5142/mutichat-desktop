@@ -1,0 +1,34 @@
+{
+  "name": "multi-account-messenger",
+  "version": "1.0.0",
+  "description": "Lightweight dual-account Facebook Messenger desktop app with RAM optimization and Quick Reply seller tools.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "npx electron-packager . Multi-Chat-Messenger --platform=win32 --arch=x64 --out=dist --overwrite"
+  },
+  "build": {
+    "appId": "com.antigravity.multichat",
+    "productName": "Multi-Chat Messenger",
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "keywords": [
+    "messenger",
+    "facebook",
+    "multi-account",
+    "electron",
+    "lightweight"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.2.0",
+    "electron-builder": "^24.13.3"
+  }
+}

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Chat Messenger</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google Fonts & FontAwesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation & Control Bar -->
+    <header class="top-bar">
+      <div class="brand">
+        <div class="logo-icon"><i class="fa-brands fa-facebook-messenger"></i></div>
+        <div class="brand-text">
+          <span class="app-title">Multi-Chat</span>
+          <span class="app-subtitle">Multi-Account Manager</span>
+        </div>
+      </div>
+
+      <!-- Add Account Button & Dynamic Tabs Bar -->
+      <div class="accounts-header-section">
+        <button id="btn-add-account" class="btn-add-acc" title="เพิ่มบัญชี Facebook / Messenger ใหม่">
+          <i class="fa-solid fa-plus-circle"></i>
+          <span>+ เพิ่มบัญชี</span>
+        </button>
+
+        <div id="account-tabs-bar" class="account-tabs-bar">
+          <!-- Dynamic Account Tabs will be rendered here -->
+        </div>
+      </div>
+
+      <!-- Quick Action Controls -->
+      <div class="top-actions">
+        <button id="btn-mode-grid" class="action-btn active" title="แสดงทุกบัญชีแบบแบ่งหน้าจอ (Grid View)">
+          <i class="fa-solid fa-table-cells-large"></i>
+          <span>แสดงแบ่งหน้าจอ</span>
+        </button>
+        <button id="btn-refresh-all" class="action-btn" title="รีเฟรชทุกหน้าจอ">
+          <i class="fa-solid fa-rotate"></i>
+          <span>รีเฟรชทั้งหมด</span>
+        </button>
+        <button id="btn-toggle-sidebar" class="action-btn highlight" title="เปิด/ปิด แถบข้อความตอบด่วนช่วยขาย">
+          <i class="fa-solid fa-bolt"></i>
+          <span>ข้อความตอบด่วน</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area with Dynamic Webviews Container and Sidebar -->
+    <main class="main-content">
+      <!-- Dynamic Panes Container -->
+      <div id="chat-container" class="chat-container mode-grid">
+        <!-- Account Webview Panes will be dynamically injected here -->
+      </div>
+
+      <!-- Quick Reply Seller Sidebar -->
+      <aside id="seller-sidebar" class="seller-sidebar">
+        <div class="sidebar-header">
+          <h3><i class="fa-solid fa-bolt text-warning"></i> ข้อความตอบด่วน</h3>
+          <button id="btn-close-sidebar" class="close-sidebar-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="sidebar-desc">คลิกปุ่มเพื่อก๊อปปี้ข้อความเตรียมไว้ แล้ววาง (Ctrl+V) ตอบแชทได้ทันที</p>
+
+        <!-- Quick Reply Category Filter / Add New Button -->
+        <div class="sidebar-actions">
+          <button id="btn-add-quick-reply" class="add-snippet-btn">
+            <i class="fa-solid fa-plus"></i> เพิ่มข้อความใหม่
+          </button>
+        </div>
+
+        <!-- Quick Reply Snippet Items List -->
+        <div id="snippet-list" class="snippet-list">
+          <!-- Snippets will be dynamically rendered here from localStorage -->
+        </div>
+
+      </aside>
+    </main>
+  </div>
+
+  <!-- Modal for Adding New Account -->
+  <div id="account-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h4><i class="fa-solid fa-user-plus text-primary"></i> เพิ่มบัญชี / จอใหม่</h4>
+        <button id="btn-close-account-modal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>เลือกแพลตฟอร์ม (Platform)</label>
+          <select id="select-account-platform" style="background:#111827; border:1px solid #374151; border-radius:6px; padding:8px 10px; color:#fff; font-size:13px; outline:none;">
+            <option value="messenger">🔵 Facebook Messenger</option>
+            <option value="instagram">📸 Instagram (IG Direct)</option>
+            <option value="tiktok">🎵 TikTok Messages</option>
+            <option value="line">🟢 LINE Official Account</option>
+            <option value="whatsapp">🟢 WhatsApp Web</option>
+            <option value="shopee">🔴 Shopee Chat</option>
+            <option value="custom">🌐 เว็บไซต์อื่นๆ (Custom URL)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>ตั้งชื่อระบุบัญชี (เช่น IG ร้านค้า / TikTok แบรนด์ A)</label>
+          <input type="text" id="input-account-name" placeholder="เช่น IG เสื้อผ้า / TikTok Shop B" />
+        </div>
+        <div class="form-group hidden" id="custom-url-group">
+          <label>ระบุ URL เว็บไซต์ที่ต้องการเปิด</label>
+          <input type="text" id="input-account-url" placeholder="https://..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-account" class="btn-secondary">ยกเลิก</button>
+        <button id="btn-save-account" class="btn-primary">เพิ่มบัญชีทันที</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Adding/Editing Custom Quick Reply Snippet -->
+  <div id="add-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h4 id="modal-snippet-title-text"><i class="fa-solid fa-plus-circle"></i> เพิ่ม/แก้ไขข้อความตอบด่วน</h4>
+        <button id="btn-close-modal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="input-snippet-id" value="" />
+        <div class="form-group">
+          <label>หัวข้อ / ชื่อนามสมมุติ</label>
+          <input type="text" id="input-snippet-title" placeholder="เช่น บัญชีไทยพาณิชย์ หรือ ราคาสินค้า A" />
+        </div>
+        <div class="form-group">
+          <label>ข้อความเต็ม (ที่จะก๊อปปี้)</label>
+          <textarea id="input-snippet-content" rows="5" placeholder="พิมพ์ข้อความที่ต้องการใช้ตอบลูกค้าบ่อยๆ ที่นี่..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-snippet" class="btn-secondary">ยกเลิก</button>
+        <button id="btn-save-snippet" class="btn-primary">บันทึกข้อความ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
