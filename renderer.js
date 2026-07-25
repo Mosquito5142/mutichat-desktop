@@ -169,6 +169,8 @@ function initAccounts() {
             <span id="status-acc-${acc.id}" class="acc-status loading"><i class="fa-solid fa-spinner fa-spin"></i></span>
           </div>
           <div class="pane-controls">
+            ${acc.id !== 1 ? `<button class="pane-btn" onclick="toggleShareSession(${acc.id})" title="${acc.partition === 'persist:account1' ? '🔗 กำลังแชร์ Cookie กับจอที่ 1 (ไม่ต้องล็อกอินซ้ำ)' : '🔒 แยก Cookie (คลิกเพื่อแชร์ Cookie กับจอที่ 1)'}" id="session-acc-${acc.id}"><i class="fa-solid fa-link" style="${acc.partition === 'persist:account1' ? 'color:#60a5fa;' : 'opacity:0.4;'}"></i></button>` : ''}
+            <button class="pane-btn" onclick="toggleAccAutoReply(${acc.id})" title="เปิด/ปิด ตอบกลับอัตโนมัติเฉพาะจอนี้" id="autoreply-acc-${acc.id}"><i class="fa-solid fa-robot"></i></button>
             <button class="pane-btn" onclick="reloadWebview(${acc.id})" title="โหลดใหม่"><i class="fa-solid fa-rotate-right"></i></button>
             <button class="pane-btn" onclick="goHome(${acc.id})" title="หน้าหลัก"><i class="fa-solid fa-house"></i></button>
             <button class="pane-btn" onclick="toggleMute(${acc.id})" title="เปิด/ปิดเสียง" id="mute-acc-${acc.id}"><i class="fa-solid fa-volume-high"></i></button>
@@ -292,6 +294,7 @@ btnCancelAccount.addEventListener('click', () => accountModal.classList.add('hid
 btnSaveAccount.addEventListener('click', () => {
   const name = inputAccountName.value.trim();
   const platform = selectPlatform.value;
+  const sessionChoice = document.getElementById('select-account-session')?.value || 'shared_main';
   let targetUrl = PLATFORM_CONFIG[platform]?.url || 'https://www.google.com';
 
   if (platform === 'custom') {
@@ -310,11 +313,13 @@ btnSaveAccount.addEventListener('click', () => {
 
   const accounts = getAccounts();
   const newId = Date.now();
+  const targetPartition = sessionChoice === 'shared_main' ? 'persist:account1' : `persist:account_${newId}`;
+
   const newAccount = {
     id: newId,
     name: name,
     platform: platform,
-    partition: `persist:account_${newId}`,
+    partition: targetPartition,
     url: targetUrl
   };
 
@@ -325,6 +330,33 @@ btnSaveAccount.addEventListener('click', () => {
   initAccounts();
   showToast(`เพิ่ม "${name}" (${PLATFORM_CONFIG[platform]?.name || 'Web'}) เรียบร้อยแล้ว!`);
 });
+
+// Toggle Share Session Handler (Fix login loop for same FB account)
+function toggleShareSession(accId) {
+  if (accId === 1) {
+    alert('จอที่ 1 เป็นเซสชันหลัก (Main Session) อยู่แล้วครับ');
+    return;
+  }
+  let accounts = getAccounts();
+  const acc = accounts.find(a => a.id === accId);
+  if (!acc) return;
+
+  const isSharedNow = (acc.partition === 'persist:account1');
+
+  if (isSharedNow) {
+    acc.partition = `persist:account_${acc.id}`;
+    saveAccounts(accounts);
+    initAccounts();
+    showToast(`สลับ "${acc.name}" เป็นแบบสิทธิ์ Cookie แยกอิสระแล้ว`);
+  } else {
+    acc.partition = 'persist:account1';
+    saveAccounts(accounts);
+    initAccounts();
+    showToast(`🔗 สลับ "${acc.name}" ให้แชร์ Cookie กับจอที่ 1 เรียบร้อยแล้ว! (ไม่ต้องล็อกอินซ้ำอีกต่อไป)`);
+  }
+}
+
+window.toggleShareSession = toggleShareSession;
 
 // Delete Account Handler
 function deleteAccount(accId) {
@@ -632,7 +664,366 @@ function showToast(message) {
   }, 2500);
 }
 
+// Auto-Reply / Away Mode Elements & Logic
+const btnToggleAutoReply = document.getElementById('btn-toggle-auto-reply');
+const btnSettingsAutoReply = document.getElementById('btn-settings-auto-reply');
+const autoReplyModal = document.getElementById('auto-reply-modal');
+const btnCloseAutoReplyModal = document.getElementById('btn-close-auto-reply-modal');
+const btnCancelAutoReply = document.getElementById('btn-cancel-auto-reply');
+const btnSaveAutoReply = document.getElementById('btn-save-auto-reply');
+const toggleAutoReplyActive = document.getElementById('toggle-auto-reply-active');
+const inputAutoReplyMessage = document.getElementById('input-auto-reply-message');
+const inputAutoReplyCooldown = document.getElementById('input-auto-reply-cooldown');
+const awayModeBanner = document.getElementById('away-mode-banner');
+const btnBannerOff = document.getElementById('btn-banner-off');
+
+const DEFAULT_AWAY_MESSAGE = `ตอนนี้ผมไม่ได้อยู่หน้าจอนะครับถ้าสนใจซื้อด่วนติดต่อทางเพจหลักไปได้เลยครับมีแอดมินรอตอบอยู่\nhttps://www.facebook.com/profile.php?id=100063915193327`;
+
+function getAutoReplyConfig() {
+  const stored = localStorage.getItem('auto_reply_config_v1');
+  if (!stored) {
+    return {
+      enabled: false,
+      message: DEFAULT_AWAY_MESSAGE,
+      cooldownMin: 30,
+      disabledAccountIds: []
+    };
+  }
+  try {
+    const parsed = JSON.parse(stored);
+    if (!parsed.disabledAccountIds) parsed.disabledAccountIds = [];
+    return parsed;
+  } catch (e) {
+    return {
+      enabled: false,
+      message: DEFAULT_AWAY_MESSAGE,
+      cooldownMin: 30,
+      disabledAccountIds: []
+    };
+  }
+}
+
+function saveAutoReplyConfig(config) {
+  localStorage.setItem('auto_reply_config_v1', JSON.stringify(config));
+  updateAutoReplyUI();
+}
+
+function toggleAccAutoReply(accId) {
+  const config = getAutoReplyConfig();
+  if (!config.disabledAccountIds) config.disabledAccountIds = [];
+
+  const idx = config.disabledAccountIds.indexOf(accId);
+  if (idx > -1) {
+    config.disabledAccountIds.splice(idx, 1);
+    showToast('เปิดการตอบกลับอัตโนมัติสำหรับจอนี้แล้ว');
+  } else {
+    config.disabledAccountIds.push(accId);
+    showToast('ปิดตอบกลับอัตโนมัติเฉพาะจอนี้เรียบร้อยแล้ว (เหมาะสำหรับเพจหลัก)');
+  }
+  saveAutoReplyConfig(config);
+}
+
+window.toggleAccAutoReply = toggleAccAutoReply;
+
+function updateAutoReplyUI() {
+  const config = getAutoReplyConfig();
+  const disabledIds = config.disabledAccountIds || [];
+
+  if (btnToggleAutoReply) {
+    if (config.enabled) {
+      btnToggleAutoReply.classList.add('active-away');
+      btnToggleAutoReply.setAttribute('title', '🤖 โหมดตอบอัตโนมัติ: เปิดอยู่ (คลิกเพื่อปิด)');
+    } else {
+      btnToggleAutoReply.classList.remove('active-away');
+      btnToggleAutoReply.setAttribute('title', '🤖 เปิด/ปิด โหมดตอบกลับอัตโนมัติ (ไม่อยู่หน้าจอ)');
+    }
+  }
+
+  // Toggle Away Mode Banner
+  if (awayModeBanner) {
+    if (config.enabled) {
+      awayModeBanner.classList.remove('hidden');
+    } else {
+      awayModeBanner.classList.add('hidden');
+    }
+  }
+
+  // Update per-account pane indicators
+  const accounts = getAccounts();
+  accounts.forEach(acc => {
+    const btn = document.getElementById(`autoreply-acc-${acc.id}`);
+    if (btn) {
+      const isDisabled = disabledIds.includes(acc.id);
+      if (!config.enabled) {
+        // Global away mode is OFF -> show neutral dimmed state
+        btn.innerHTML = '<i class="fa-solid fa-robot" style="opacity: 0.4; color: #9ca3af;"></i>';
+        btn.setAttribute('title', `🤖 โหมดไม่อยู่หน้าจอปิดอยู่ (เปิดที่แถบเมนูด้านบน)`);
+        btn.style.borderColor = '#374151';
+        btn.style.background = 'transparent';
+      } else if (isDisabled) {
+        // Global away mode is ON, but this pane is EXCLUDED
+        btn.innerHTML = '<i class="fa-solid fa-robot" style="opacity: 0.3; color: #ef4444;"></i>';
+        btn.setAttribute('title', `[ยกเว้น] จอ "${acc.name}" ปิดตอบกลับอัตโนมัติอยู่ (คลิกเพื่อเปิด)`);
+        btn.style.borderColor = '#ef4444';
+        btn.style.background = 'transparent';
+      } else {
+        // Global away mode is ON, and this pane is ACTIVE
+        btn.innerHTML = '<i class="fa-solid fa-robot" style="color: #34d399;"></i>';
+        btn.setAttribute('title', `[ทำงานอยู่] จอ "${acc.name}" เปิดตอบกลับอัตโนมัติอยู่ (คลิกเพื่อปิดเฉพาะจอนี้)`);
+        btn.style.borderColor = '#34d399';
+        btn.style.background = 'rgba(16, 185, 129, 0.2)';
+      }
+    }
+  });
+}
+
+if (btnToggleAutoReply) {
+  btnToggleAutoReply.addEventListener('click', () => {
+    const config = getAutoReplyConfig();
+    config.enabled = !config.enabled;
+    saveAutoReplyConfig(config);
+    if (config.enabled) {
+      showToast('🤖 เปิดโหมดไม่อยู่หน้าจอเรียบร้อยแล้ว (ระบบจะส่งลิงก์เพจหลักให้อัตโนมัติเมื่อมีคนทักมา)');
+    } else {
+      showToast('ปิดโหมดไม่อยู่หน้าจอแล้ว');
+    }
+  });
+}
+
+if (btnBannerOff) {
+  btnBannerOff.addEventListener('click', () => {
+    const config = getAutoReplyConfig();
+    config.enabled = false;
+    saveAutoReplyConfig(config);
+    showToast('ปิดโหมดไม่อยู่หน้าจอแล้ว');
+  });
+}
+
+if (btnSettingsAutoReply) {
+  btnSettingsAutoReply.addEventListener('click', openAutoReplyModal);
+}
+
+function openAutoReplyModal() {
+  const config = getAutoReplyConfig();
+  const disabledIds = config.disabledAccountIds || [];
+
+  if (toggleAutoReplyActive) toggleAutoReplyActive.checked = config.enabled;
+  if (inputAutoReplyMessage) inputAutoReplyMessage.value = config.message || DEFAULT_AWAY_MESSAGE;
+  if (inputAutoReplyCooldown) inputAutoReplyCooldown.value = config.cooldownMin || 30;
+
+  const accountsListEl = document.getElementById('auto-reply-accounts-list');
+  if (accountsListEl) {
+    accountsListEl.innerHTML = '';
+    const accounts = getAccounts();
+    accounts.forEach(acc => {
+      const isChecked = !disabledIds.includes(acc.id);
+      const iconHtml = getPlatformIcon(acc.platform);
+      const row = document.createElement('label');
+      row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 13px; color: #e5e7eb; padding: 4px 0;';
+      row.innerHTML = `
+        <span>${iconHtml} ${escapeHtml(acc.name)}</span>
+        <input type="checkbox" class="acc-auto-reply-cb" data-acc-id="${acc.id}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #10b981; cursor: pointer;">
+      `;
+      accountsListEl.appendChild(row);
+    });
+  }
+
+  if (autoReplyModal) autoReplyModal.classList.remove('hidden');
+}
+
+function closeAutoReplyModal() {
+  if (autoReplyModal) autoReplyModal.classList.add('hidden');
+}
+
+if (btnCloseAutoReplyModal) btnCloseAutoReplyModal.addEventListener('click', closeAutoReplyModal);
+if (btnCancelAutoReply) btnCancelAutoReply.addEventListener('click', closeAutoReplyModal);
+
+if (btnSaveAutoReply) {
+  btnSaveAutoReply.addEventListener('click', () => {
+    const enabled = toggleAutoReplyActive ? toggleAutoReplyActive.checked : false;
+    const message = inputAutoReplyMessage ? inputAutoReplyMessage.value.trim() : DEFAULT_AWAY_MESSAGE;
+    const cooldownMin = inputAutoReplyCooldown ? parseInt(inputAutoReplyCooldown.value, 10) || 30 : 30;
+
+    if (!message) {
+      alert('กรุณากรอกข้อความตอบกลับอัตโนมัติ');
+      return;
+    }
+
+    const disabledAccountIds = [];
+    document.querySelectorAll('.acc-auto-reply-cb').forEach(cb => {
+      if (!cb.checked) {
+        const id = parseInt(cb.getAttribute('data-acc-id'), 10);
+        if (id) disabledAccountIds.push(id);
+      }
+    });
+
+    saveAutoReplyConfig({ enabled, message, cooldownMin, disabledAccountIds });
+    closeAutoReplyModal();
+    showToast('บันทึกการตั้งค่าโหมดไม่อยู่หน้าจอเรียบร้อยแล้ว!');
+  });
+}
+
+// Periodic Auto-Reply Execution Engine
+setInterval(() => {
+  const config = getAutoReplyConfig();
+  if (!config.enabled) return;
+
+  const disabledIds = config.disabledAccountIds || [];
+  const accounts = getAccounts();
+
+  accounts.forEach(acc => {
+    // Skip accounts that are explicitly disabled for auto reply (e.g. Main Page)
+    if (disabledIds.includes(acc.id)) return;
+
+    const wv = document.getElementById(`webview-${acc.id}`);
+    if (!wv || typeof wv.executeJavaScript !== 'function') return;
+
+    const cooldownMs = (config.cooldownMin || 30) * 60 * 1000;
+    const msgText = config.message || DEFAULT_AWAY_MESSAGE;
+
+    const code = `
+      (function() {
+        try {
+          if (!window.__mutichat_replied_map) window.__mutichat_replied_map = {};
+          const now = Date.now();
+          const cooldownMs = ${cooldownMs};
+          const msgText = ${JSON.stringify(msgText)};
+
+          // 1. Scan sidebar for unread items sent by customer
+          const unreadItems = document.querySelectorAll('div[role="row"], div[role="gridcell"], div[role="listitem"], a[href*="/t/"], a[href*="/messages/t/"]');
+          let unreadTarget = null;
+
+          for (const item of unreadItems) {
+            const html = item.innerHTML || '';
+            const isUnread = html.includes('var(--accent)') ||
+                             html.includes('rgb(0, 132, 255)') ||
+                             html.includes('rgb(49, 142, 255)') ||
+                             item.querySelector('span[style*="font-weight: 600"], span[style*="font-weight: bold"], span[style*="font-weight:700"]') ||
+                             item.querySelector('[aria-label*="Unread"], [aria-label*="ยังไม่ได้อ่าน"]');
+
+            if (isUnread) {
+              const textContent = item.textContent || '';
+              // Exclude items where preview says "คุณ:" / "You:" (meaning we already sent the last message)
+              if (!textContent.includes('คุณ:') && !textContent.includes('You:')) {
+                unreadTarget = item.tagName.toLowerCase() === 'a' ? item : (item.querySelector('a[href]') || item);
+                break;
+              }
+            }
+          }
+
+          // If an unread thread from customer is found:
+          if (unreadTarget) {
+            const targetHref = unreadTarget.href || unreadTarget.getAttribute('href') || '';
+            
+            // If we are NOT on that target thread yet, click it and STOP (DO NOT reply to current thread!)
+            if (targetHref && !location.href.includes(targetHref) && location.href !== targetHref) {
+              unreadTarget.click();
+              if (unreadTarget.tagName.toLowerCase() === 'a') {
+                unreadTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+              }
+              return { status: 'opening_unread_thread', targetHref };
+            }
+          }
+
+          // 2. We are in an open conversation thread now. Verify if we should reply:
+          const inputBox = document.querySelector('div[role="textbox"][contenteditable="true"]') ||
+                           document.querySelector('div[contenteditable="true"][aria-label*="Message"]') ||
+                           document.querySelector('div[contenteditable="true"][aria-label*="ข้อความ"]') ||
+                           document.querySelector('div[contenteditable="true"]') ||
+                           document.querySelector('textarea[name="body"]') ||
+                           document.querySelector('textarea');
+
+          if (!inputBox) return { status: 'no_input' };
+
+          const threadKey = location.href || 'active_thread';
+          const lastSent = window.__mutichat_replied_map[threadKey] || 0;
+
+          if (now - lastSent < cooldownMs) {
+            return { status: 'cooldown', threadKey };
+          }
+
+          // SAFETY CHECK 1: Verify that current active thread sidebar row does NOT show "คุณ:" or "You:"
+          const activeRow = document.querySelector('div[role="row"][aria-selected="true"], div[aria-current="page"], a[aria-current="page"]');
+          if (activeRow) {
+            const activeText = activeRow.textContent || '';
+            if (activeText.includes('คุณ:') || activeText.includes('You:')) {
+              return { status: 'already_replied_by_user' };
+            }
+          }
+
+          // SAFETY CHECK 2: Check recent messages in open chat
+          const msgList = document.querySelector('div[role="main"]') || document.body;
+          const allMsgs = msgList.querySelectorAll('div[role="row"], div[aria-label*="ข้อความ"]');
+          if (allMsgs.length > 0) {
+            const lastMsg = allMsgs[allMsgs.length - 1];
+            const lastMsgText = lastMsg.textContent || '';
+            if (lastMsgText.includes('ตอนนี้ผมไม่ได้อยู่หน้าจอ') || lastMsgText.includes('https://www.facebook.com/profile.php')) {
+              window.__mutichat_replied_map[threadKey] = now;
+              return { status: 'already_sent_away_msg' };
+            }
+          }
+
+          // ALL CHECKS PASSED: Safe to send auto reply to this open thread!
+          inputBox.focus();
+
+          if (inputBox.tagName.toLowerCase() === 'textarea') {
+            inputBox.value = msgText;
+            inputBox.dispatchEvent(new Event('input', { bubbles: true }));
+            const sendBtn = document.querySelector('input[type="submit"], button[type="submit"], input[name="send"]');
+            if (sendBtn) sendBtn.click();
+          } else {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(inputBox);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            document.execCommand('insertText', false, msgText);
+
+            if (!inputBox.textContent || !inputBox.textContent.includes('http')) {
+              inputBox.textContent = msgText;
+              inputBox.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, data: msgText }));
+            }
+
+            setTimeout(() => {
+              const enterDown = new KeyboardEvent('keydown', {
+                key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true
+              });
+              inputBox.dispatchEvent(enterDown);
+
+              const enterUp = new KeyboardEvent('keyup', {
+                key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true
+              });
+              inputBox.dispatchEvent(enterUp);
+
+              const sendBtn = document.querySelector('div[role="button"][aria-label*="Enter"], div[role="button"][aria-label*="ส่ง"], div[role="button"][aria-label*="Send"], svg[aria-label*="Send"]');
+              if (sendBtn) {
+                const btn = sendBtn.closest('div[role="button"]') || sendBtn;
+                btn.click();
+              }
+            }, 200);
+          }
+
+          window.__mutichat_replied_map[threadKey] = now;
+          return { status: 'sent', threadKey };
+        } catch(e) {
+          return { status: 'error', err: e.message };
+        }
+      })();
+    `;
+
+    wv.executeJavaScript(code).then(res => {
+      if (res && res.status === 'sent') {
+        showToast(`🤖 [${acc.name}] ตอบกลับอัตโนมัติโยนไปเพจหลักเรียบร้อยแล้ว!`);
+      }
+    }).catch(() => {});
+  });
+}, 3000);
+
 // Initialize App
 initAccounts();
 renderSnippets();
+updateAutoReplyUI();
+
+
 

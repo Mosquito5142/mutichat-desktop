@@ -37,6 +37,13 @@
 
       <!-- Quick Action Controls -->
       <div class="top-actions">
+        <button id="btn-toggle-auto-reply" class="action-btn auto-reply-btn" title="เปิด/ปิด โหมดตอบกลับอัตโนมัติ (ไม่อยู่หน้าจอ)">
+          <i class="fa-solid fa-robot"></i>
+          <span>ตอบไม่อยู่หน้าจอ</span>
+        </button>
+        <button id="btn-settings-auto-reply" class="action-btn" title="ตั้งค่าข้อความตอบกลับอัตโนมัติ (Away Mode)">
+          <i class="fa-solid fa-sliders"></i>
+        </button>
         <button id="btn-mode-grid" class="action-btn active" title="แสดงทุกบัญชีแบบแบ่งหน้าจอ (Grid View)">
           <i class="fa-solid fa-table-cells-large"></i>
           <span>แสดงแบ่งหน้าจอ</span>
@@ -51,6 +58,15 @@
         </button>
       </div>
     </header>
+
+    <!-- Away Mode Active Banner Indicator -->
+    <div id="away-mode-banner" class="away-mode-banner hidden">
+      <div class="banner-content">
+        <i class="fa-solid fa-robot pulse-icon"></i>
+        <span><strong>โหมดไม่อยู่หน้าจอกำลังทำงาน:</strong> ระบบจะเฝ้าตอบแชทและส่งลิงก์เพจหลักให้ลูกค้าอัตโนมัติ</span>
+      </div>
+      <button id="btn-banner-off" class="btn-banner-off"><i class="fa-solid fa-power-off"></i> ปิดโหมดนี้</button>
+    </div>
 
     <!-- Main Content Area with Dynamic Webviews Container and Sidebar -->
     <main class="main-content">
@@ -111,6 +127,14 @@
           <label>ระบุ URL เว็บไซต์ที่ต้องการเปิด</label>
           <input type="text" id="input-account-url" placeholder="https://..." />
         </div>
+        <div class="form-group">
+          <label><i class="fa-solid fa-key text-warning"></i> รูปแบบ Cookie Session</label>
+          <select id="select-account-session" style="background:#111827; border:1px solid #374151; border-radius:6px; padding:8px 10px; color:#fff; font-size:13px; outline:none; width:100%;">
+            <option value="shared_main">🔗 แชร์ Cookie กับจอที่ 1 (สำหรับบัญชีเดียวกัน: จอส่วนตัว + จอเพจ)</option>
+            <option value="separate">🔒 แยก Cookie อิสระ (สำหรับคนละบัญชี Facebook)</option>
+          </select>
+          <span style="font-size:11px; color:#9ca3af; margin-top:4px; display:block;">💡 ถ้าเป็นบัญชี Facebook เดียวกัน ให้เลือก "แชร์ Cookie กับจอที่ 1" ล็อกอินครั้งเดียวจะเข้าใช้งานได้ทุกจอโดยไม่เด้งหลุด!</span>
+        </div>
       </div>
       <div class="modal-footer">
         <button id="btn-cancel-account" class="btn-secondary">ยกเลิก</button>
@@ -140,6 +164,43 @@
       <div class="modal-footer">
         <button id="btn-cancel-snippet" class="btn-secondary">ยกเลิก</button>
         <button id="btn-save-snippet" class="btn-primary">บันทึกข้อความ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Auto Reply Settings (Away Mode) -->
+  <div id="auto-reply-modal" class="modal-overlay hidden">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h4><i class="fa-solid fa-robot text-primary"></i> ตั้งค่าโหมดตอบกลับอัตโนมัติ (Away Mode)</h4>
+        <button id="btn-close-auto-reply-modal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 12px; border-radius: 8px;">
+          <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0;">
+            <span style="font-size: 14px; font-weight: 600; color: #34d399;"><i class="fa-solid fa-power-off"></i> เปิดใช้งานโหมดไม่อยู่หน้าจอ</span>
+            <input type="checkbox" id="toggle-auto-reply-active" style="width: 20px; height: 20px; cursor: pointer; accent-color: #10b981;">
+          </label>
+        </div>
+        <div class="form-group">
+          <label>ข้อความตอบกลับอัตโนมัติ (ที่จะส่งเมื่อมีคนทักแชทมา)</label>
+          <textarea id="input-auto-reply-message" rows="5" placeholder="พิมพ์ข้อความที่ต้องการส่งตอบลูกค้าอัตโนมัติ..." style="width:100%; background:#111827; border:1px solid #374151; border-radius:6px; padding:10px; color:#fff; font-size:13px; outline:none; resize:vertical; line-height: 1.5;"></textarea>
+        </div>
+        <div class="form-group">
+          <label><i class="fa-solid fa-clock"></i> Cooldown (นาที) ป้องกันส่งซ้ำใส่ลูกค้าเดิม</label>
+          <input type="number" id="input-auto-reply-cooldown" value="30" min="1" max="1440" style="width:100%; background:#111827; border:1px solid #374151; border-radius:6px; padding:8px 10px; color:#fff; font-size:13px; outline:none;" />
+          <span style="font-size: 11px; color: #9ca3af; margin-top: 4px; display: block;">ระบบจะไม่ส่งข้อความตอบกลับใส่ลูกค้าคนเดิมซ้ำภายในเวลาที่กำหนด</span>
+        </div>
+        <div class="form-group">
+          <label><i class="fa-solid fa-display"></i> เลือกจอที่ต้องการให้ตอบกลับอัตโนมัติ (ปิดเฉพาะจอที่เป็นเพจหลักได้)</label>
+          <div id="auto-reply-accounts-list" style="display: flex; flex-direction: column; gap: 8px; background: #111827; border: 1px solid #374151; border-radius: 6px; padding: 10px; max-height: 140px; overflow-y: auto;">
+            <!-- Dynamic account checkboxes will be inserted here -->
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-auto-reply" class="btn-secondary">ยกเลิก</button>
+        <button id="btn-save-auto-reply" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> บันทึกตั้งค่า</button>
       </div>
     </div>
   </div>
