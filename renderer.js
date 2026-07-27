@@ -708,23 +708,6 @@ function saveAutoReplyConfig(config) {
   updateAutoReplyUI();
 }
 
-function toggleAccAutoReply(accId) {
-  const config = getAutoReplyConfig();
-  if (!config.disabledAccountIds) config.disabledAccountIds = [];
-
-  const idx = config.disabledAccountIds.indexOf(accId);
-  if (idx > -1) {
-    config.disabledAccountIds.splice(idx, 1);
-    showToast('เปิดการตอบกลับอัตโนมัติสำหรับจอนี้แล้ว');
-  } else {
-    config.disabledAccountIds.push(accId);
-    showToast('ปิดตอบกลับอัตโนมัติเฉพาะจอนี้เรียบร้อยแล้ว (เหมาะสำหรับเพจหลัก)');
-  }
-  saveAutoReplyConfig(config);
-}
-
-window.toggleAccAutoReply = toggleAccAutoReply;
-
 function updateAutoReplyUI() {
   const config = getAutoReplyConfig();
   const disabledIds = config.disabledAccountIds || [];
@@ -755,19 +738,16 @@ function updateAutoReplyUI() {
     if (btn) {
       const isDisabled = disabledIds.includes(acc.id);
       if (!config.enabled) {
-        // Global away mode is OFF -> show neutral dimmed state
         btn.innerHTML = '<i class="fa-solid fa-robot" style="opacity: 0.4; color: #9ca3af;"></i>';
         btn.setAttribute('title', `🤖 โหมดไม่อยู่หน้าจอปิดอยู่ (เปิดที่แถบเมนูด้านบน)`);
         btn.style.borderColor = '#374151';
         btn.style.background = 'transparent';
       } else if (isDisabled) {
-        // Global away mode is ON, but this pane is EXCLUDED
         btn.innerHTML = '<i class="fa-solid fa-robot" style="opacity: 0.3; color: #ef4444;"></i>';
         btn.setAttribute('title', `[ยกเว้น] จอ "${acc.name}" ปิดตอบกลับอัตโนมัติอยู่ (คลิกเพื่อเปิด)`);
         btn.style.borderColor = '#ef4444';
         btn.style.background = 'transparent';
       } else {
-        // Global away mode is ON, and this pane is ACTIVE
         btn.innerHTML = '<i class="fa-solid fa-robot" style="color: #34d399;"></i>';
         btn.setAttribute('title', `[ทำงานอยู่] จอ "${acc.name}" เปิดตอบกลับอัตโนมัติอยู่ (คลิกเพื่อปิดเฉพาะจอนี้)`);
         btn.style.borderColor = '#34d399';
@@ -872,7 +852,6 @@ setInterval(() => {
   const accounts = getAccounts();
 
   accounts.forEach(acc => {
-    // Skip accounts that are explicitly disabled for auto reply (e.g. Main Page)
     if (disabledIds.includes(acc.id)) return;
 
     const wv = document.getElementById(`webview-${acc.id}`);
@@ -889,43 +868,49 @@ setInterval(() => {
           const cooldownMs = ${cooldownMs};
           const msgText = ${JSON.stringify(msgText)};
 
-          // 1. Scan sidebar for unread items sent by customer
-          const unreadItems = document.querySelectorAll('div[role="row"], div[role="gridcell"], div[role="listitem"], a[href*="/t/"], a[href*="/messages/t/"]');
-          let unreadTarget = null;
+          function getThreadName(el) {
+            if (!el) return '';
+            const bold = el.querySelector('span[style*="font-weight: 600"], span[style*="font-weight: bold"], span[style*="font-weight:700"]');
+            if (bold && bold.textContent) return bold.textContent.trim();
+            return el.textContent ? el.textContent.trim().substring(0, 30) : '';
+          }
 
-          for (const item of unreadItems) {
-            const html = item.innerHTML || '';
+          // 1. Scan sidebar for unread items sent by customer
+          const rows = document.querySelectorAll('div[role="row"], div[role="gridcell"], div[role="listitem"], a[href*="/t/"], a[href*="/messages/t/"]');
+          let unreadRow = null;
+
+          for (const r of rows) {
+            const html = r.innerHTML || '';
+            const text = r.textContent || '';
             const isUnread = html.includes('var(--accent)') ||
                              html.includes('rgb(0, 132, 255)') ||
                              html.includes('rgb(49, 142, 255)') ||
-                             item.querySelector('span[style*="font-weight: 600"], span[style*="font-weight: bold"], span[style*="font-weight:700"]') ||
-                             item.querySelector('[aria-label*="Unread"], [aria-label*="ยังไม่ได้อ่าน"]');
+                             r.querySelector('span[style*="font-weight: 600"], span[style*="font-weight: bold"], span[style*="font-weight:700"]') ||
+                             r.querySelector('[aria-label*="Unread"], [aria-label*="ยังไม่ได้อ่าน"]');
 
-            if (isUnread) {
-              const textContent = item.textContent || '';
-              // Exclude items where preview says "คุณ:" / "You:" (meaning we already sent the last message)
-              if (!textContent.includes('คุณ:') && !textContent.includes('You:')) {
-                unreadTarget = item.tagName.toLowerCase() === 'a' ? item : (item.querySelector('a[href]') || item);
-                break;
-              }
+            if (isUnread && !text.includes('คุณ:') && !text.includes('You:')) {
+              unreadRow = r;
+              break;
             }
           }
 
-          // If an unread thread from customer is found:
-          if (unreadTarget) {
-            const targetHref = unreadTarget.href || unreadTarget.getAttribute('href') || '';
-            
-            // If we are NOT on that target thread yet, click it and STOP (DO NOT reply to current thread!)
-            if (targetHref && !location.href.includes(targetHref) && location.href !== targetHref) {
-              unreadTarget.click();
-              if (unreadTarget.tagName.toLowerCase() === 'a') {
-                unreadTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+          // If unread thread exists and is not currently selected:
+          if (unreadRow) {
+            const isSelected = unreadRow.getAttribute('aria-selected') === 'true' || 
+                               unreadRow.classList.contains('selected') || 
+                               unreadRow.querySelector('[aria-current="page"]');
+
+            if (!isSelected) {
+              const link = unreadRow.tagName.toLowerCase() === 'a' ? unreadRow : (unreadRow.querySelector('a[href]') || unreadRow);
+              link.click();
+              if (link.dispatchEvent) {
+                link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
               }
-              return { status: 'opening_unread_thread', targetHref };
+              return { status: 'switching_to_unread' };
             }
           }
 
-          // 2. We are in an open conversation thread now. Verify if we should reply:
+          // 2. We are on an open thread. Locate input box
           const inputBox = document.querySelector('div[role="textbox"][contenteditable="true"]') ||
                            document.querySelector('div[contenteditable="true"][aria-label*="Message"]') ||
                            document.querySelector('div[contenteditable="true"][aria-label*="ข้อความ"]') ||
@@ -935,19 +920,23 @@ setInterval(() => {
 
           if (!inputBox) return { status: 'no_input' };
 
-          const threadKey = location.href || 'active_thread';
-          const lastSent = window.__mutichat_replied_map[threadKey] || 0;
+          // Identify thread uniquely by customer name or header
+          const activeRow = document.querySelector('div[role="row"][aria-selected="true"], [aria-current="page"]');
+          const activeHeader = document.querySelector('div[role="main"] h2, header h2');
+          const threadId = activeHeader ? activeHeader.textContent.trim() : (activeRow ? getThreadName(activeRow) : location.href);
 
+          if (!threadId) return { status: 'no_thread_id' };
+
+          const lastSent = window.__mutichat_replied_map[threadId] || 0;
           if (now - lastSent < cooldownMs) {
-            return { status: 'cooldown', threadKey };
+            return { status: 'cooldown', threadId };
           }
 
-          // SAFETY CHECK 1: Verify that current active thread sidebar row does NOT show "คุณ:" or "You:"
-          const activeRow = document.querySelector('div[role="row"][aria-selected="true"], div[aria-current="page"], a[aria-current="page"]');
+          // SAFETY CHECK 1: Verify active sidebar row preview does NOT show "คุณ:" or "You:"
           if (activeRow) {
             const activeText = activeRow.textContent || '';
             if (activeText.includes('คุณ:') || activeText.includes('You:')) {
-              return { status: 'already_replied_by_user' };
+              return { status: 'already_replied_by_user', threadId };
             }
           }
 
@@ -956,14 +945,14 @@ setInterval(() => {
           const allMsgs = msgList.querySelectorAll('div[role="row"], div[aria-label*="ข้อความ"]');
           if (allMsgs.length > 0) {
             const lastMsg = allMsgs[allMsgs.length - 1];
-            const lastMsgText = lastMsg.textContent || '';
-            if (lastMsgText.includes('ตอนนี้ผมไม่ได้อยู่หน้าจอ') || lastMsgText.includes('https://www.facebook.com/profile.php')) {
-              window.__mutichat_replied_map[threadKey] = now;
-              return { status: 'already_sent_away_msg' };
+            const lastText = lastMsg.textContent || '';
+            if (lastText.includes('ตอนนี้ผมไม่ได้อยู่หน้าจอ') || lastText.includes('https://www.facebook.com/profile.php')) {
+              window.__mutichat_replied_map[threadId] = now;
+              return { status: 'already_sent_away_msg', threadId };
             }
           }
 
-          // ALL CHECKS PASSED: Safe to send auto reply to this open thread!
+          // ALL CHECKS PASSED: Safe to send away message to this customer!
           inputBox.focus();
 
           if (inputBox.tagName.toLowerCase() === 'textarea') {
@@ -1004,8 +993,8 @@ setInterval(() => {
             }, 200);
           }
 
-          window.__mutichat_replied_map[threadKey] = now;
-          return { status: 'sent', threadKey };
+          window.__mutichat_replied_map[threadId] = now;
+          return { status: 'sent', threadId };
         } catch(e) {
           return { status: 'error', err: e.message };
         }
@@ -1018,7 +1007,7 @@ setInterval(() => {
       }
     }).catch(() => {});
   });
-}, 3000);
+}, 2500);
 
 // Initialize App
 initAccounts();
