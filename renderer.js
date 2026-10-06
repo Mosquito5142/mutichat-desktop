@@ -661,7 +661,7 @@ function showToast(message) {
     toast.style.opacity = '0';
     toast.style.transition = 'opacity 0.3s ease';
     setTimeout(() => toast.remove(), 300);
-  }, 2500);
+  }, 1200);
 }
 
 // Auto-Reply / Away Mode Elements & Logic

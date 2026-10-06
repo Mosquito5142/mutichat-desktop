@@ -824,12 +824,13 @@ webview {
 /* Toast Notifications */
 .toast-container {
   position: fixed;
-  bottom: 20px;
+  top: 20px;
   right: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 100;
+  pointer-events: none; /* never block clicks on the chat input underneath */
 }
 
 .toast {
@@ -844,11 +845,12 @@ webview {
   align-items: center;
   gap: 8px;
   animation: slideIn 0.3s ease forwards;
+  pointer-events: none;
 }
 
 @keyframes slideIn {
   from {
-    transform: translateY(100%);
+    transform: translateY(-100%);
     opacity: 0;
   }
   to {
