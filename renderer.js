@@ -185,6 +185,7 @@ function initAccounts() {
             <span class="drag-handle" title="ลากเพื่อเรียงลำดับใหม่"><i class="fa-solid fa-grip-vertical"></i></span>
             <span class="acc-badge acc1-badge">${iconHtml} ${escapeHtml(acc.name)}</span>
             <span id="status-acc-${acc.id}" class="acc-status loading"><i class="fa-solid fa-spinner fa-spin"></i></span>
+            <button id="zoom-acc-${acc.id}" class="pane-zoom-badge hidden" onclick="resetPaneZoom(${acc.id})" title="ขนาดตัวอักษรจอนี้ (คลิกเพื่อกลับเป็น 100%) — ปรับด้วย Ctrl + / Ctrl - หรือ Ctrl + ลูกกลิ้งเมาส์"></button>
           </div>
           <div class="pane-controls">
             ${acc.id !== 1 ? `<button class="pane-btn" onclick="toggleShareSession(${acc.id})" title="${acc.partition === 'persist:account1' ? '🔗 กำลังแชร์ Cookie กับจอที่ 1 (ไม่ต้องล็อกอินซ้ำ)' : '🔒 แยก Cookie (คลิกเพื่อแชร์ Cookie กับจอที่ 1)'}" id="session-acc-${acc.id}"><i class="fa-solid fa-link" style="${acc.partition === 'persist:account1' ? 'color:#60a5fa;' : 'opacity:0.4;'}"></i></button>` : ''}
@@ -448,6 +449,11 @@ window.toggleMute = toggleMute;
 
 // Setup Webview Listeners
 function setupWebviewEvents(wv, statusEl, accId) {
+  // Re-apply this pane's saved zoom on every page load (and now, in case the page is already up)
+  const applySavedZoom = () => applyPaneZoom(accId, getAccounts().find(a => a.id === accId)?.zoom || 0);
+  wv.addEventListener('dom-ready', applySavedZoom);
+  applySavedZoom();
+
   wv.addEventListener('did-start-loading', () => {
     statusEl.className = 'acc-status loading';
     statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...';
@@ -754,6 +760,62 @@ document.getElementById('btn-yt-home').addEventListener('click', () => youtubeNa
 document.getElementById('btn-yt-close').addEventListener('click', closeYoutube);
 // Ctrl+Shift+Y works even while a webview has focus (forwarded from main process)
 ipcRenderer.on('toggle-youtube', toggleYoutube);
+
+// ===== Per-pane zoom (Ctrl + / Ctrl - / Ctrl 0 / Ctrl + wheel), remembered per account =====
+const ZOOM_STEP = 0.5;
+const ZOOM_MIN = -3;
+const ZOOM_MAX = 4;
+
+function applyPaneZoom(accId, level) {
+  const wv = document.getElementById(`webview-${accId}`);
+  if (!wv) return;
+  try { wv.setZoomLevel(level); } catch (e) {}
+  const badge = document.getElementById(`zoom-acc-${accId}`);
+  if (badge) {
+    badge.textContent = `${Math.round(Math.pow(1.2, level) * 100)}%`;
+    badge.classList.toggle('hidden', level === 0);
+  }
+}
+
+function getPaneHost(accId) {
+  try { return new URL(document.getElementById(`webview-${accId}`).getURL()).host; } catch (e) { return null; }
+}
+
+function setPaneZoom(accId, level) {
+  const accounts = getAccounts();
+  const acc = accounts.find(a => a.id === accId);
+  if (!acc) return;
+  // Chromium shares zoom between panes on the same cookie session + website,
+  // so keep those linked panes' saved value and badge in step
+  const host = getPaneHost(accId);
+  accounts.forEach(other => {
+    if (other.id === accId || (other.partition === acc.partition && host && getPaneHost(other.id) === host)) {
+      other.zoom = level;
+      applyPaneZoom(other.id, level);
+    }
+  });
+  saveAccounts(accounts);
+}
+
+function resetPaneZoom(accId) {
+  setPaneZoom(accId, 0);
+}
+window.resetPaneZoom = resetPaneZoom;
+
+ipcRenderer.on('zoom-pane', (_event, webContentsId, action) => {
+  const wv = [...document.querySelectorAll('webview')].find(w => {
+    try { return w.getWebContentsId() === webContentsId; } catch (e) { return false; }
+  });
+  if (!wv) return;
+
+  const current = wv.getZoomLevel();
+  const next = action === 'reset' ? 0
+    : Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, current + (action === 'in' ? ZOOM_STEP : -ZOOM_STEP)));
+
+  const accMatch = wv.id.match(/^webview-(\d+)$/);
+  if (accMatch) setPaneZoom(parseInt(accMatch[1], 10), next);
+  else wv.setZoomLevel(next); // YouTube: zoom for this session only
+});
 
 // Seller Sidebar Toggle
 btnToggleSidebar.addEventListener('click', () => sellerSidebar.classList.toggle('open'));
