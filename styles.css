@@ -258,65 +258,6 @@ body {
   opacity: 1;
 }
 
-/* Auto-Reply / Away Mode active state */
-.action-btn.auto-reply-btn.active-away {
-  background: linear-gradient(135deg, #059669, #10b981) !important;
-  color: #ffffff !important;
-  border-color: #34d399 !important;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
-  animation: away-pulse 2s infinite ease-in-out;
-}
-
-@keyframes away-pulse {
-  0%, 100% {
-    box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 14px rgba(16, 185, 129, 0.8);
-  }
-}
-
-/* Away Mode Banner Styling */
-.away-mode-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #059669, #10b981);
-  color: #ffffff;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-  z-index: 90;
-  flex-shrink: 0;
-}
-
-.away-mode-banner .banner-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.away-mode-banner .pulse-icon {
-  font-size: 16px;
-}
-
-.btn-banner-off {
-  background: rgba(0, 0, 0, 0.25);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 3px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-banner-off:hover {
-  background: #ef4444;
-  border-color: #f87171;
-}
-
 .action-btn.highlight {
   background: linear-gradient(135deg, #059669, #10b981);
   border: none;
@@ -614,6 +555,35 @@ webview {
   border-color: #60a5fa;
 }
 
+/* Export / Import Quick Replies */
+.snippet-io-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.snippet-io-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid #374151;
+  color: #9ca3af;
+  padding: 5px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.snippet-io-btn:hover {
+  background: #1f2937;
+  border-color: #60a5fa;
+  color: #60a5fa;
+}
+
 /* Snippets List & Cards */
 .snippet-list {
   display: flex;
@@ -857,4 +827,223 @@ webview {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+/* YouTube Floating View — sits on top of the chat area, chats keep running underneath */
+.youtube-btn i {
+  color: #ef4444;
+}
+
+.youtube-btn.yt-alive {
+  position: relative;
+}
+
+.youtube-btn.yt-alive::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.youtube-view {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  background: #0f0f0f;
+}
+
+.youtube-view.hidden {
+  display: none;
+}
+
+.youtube-view.yt-fullscreen {
+  position: fixed;
+  z-index: 9000;
+}
+
+.youtube-view.yt-fullscreen .youtube-view-header {
+  display: none;
+}
+
+.youtube-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
+}
+
+.youtube-view-header .yt-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.youtube-view-header .yt-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.youtube-view-header .yt-title i {
+  color: #ef4444;
+}
+
+.youtube-webview-host {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.youtube-webview-host webview {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+}
+
+/* YouTube Mini Player — small, draggable, keeps playing while you chat */
+.youtube-view.yt-mini {
+  position: fixed;
+  inset: auto;
+  width: 384px;
+  height: 216px;
+  z-index: 8000;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #334155;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.youtube-view.yt-mini .youtube-view-header {
+  display: none;
+}
+
+.yt-mini-overlay {
+  display: none;
+}
+
+.youtube-view.yt-mini .yt-mini-overlay {
+  display: block;
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.youtube-view.yt-mini .yt-mini-overlay:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.yt-mini-controls {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.yt-mini-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.yt-mini-overlay:hover .yt-mini-controls,
+.yt-mini-overlay:hover .yt-mini-hint {
+  opacity: 1;
+}
+
+.yt-mini-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.yt-mini-btn:hover {
+  background: #ef4444;
+}
+
+/* Play/pause toggle shows both icons side by side */
+#btn-yt-mini-play {
+  width: 40px;
+  border-radius: 14px;
+}
+
+#btn-yt-mini-play i + i {
+  margin-left: 3px;
+}
+
+body.mc-dragging webview {
+  pointer-events: none;
+}
+
+body.mc-dragging .yt-mini-overlay {
+  cursor: grabbing;
+}
+
+/* Mini player corner resize handles */
+.yt-mini-resize {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.yt-mini-overlay:hover .yt-mini-resize,
+body.mc-resizing .yt-mini-resize {
+  opacity: 1;
+}
+
+.yt-mini-resize::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: #f1f5f9;
+  border-style: solid;
+  border-width: 0;
+}
+
+.yt-mini-resize[data-corner="tl"] { top: 0; left: 0; cursor: nwse-resize; }
+.yt-mini-resize[data-corner="br"] { bottom: 0; right: 0; cursor: nwse-resize; }
+.yt-mini-resize[data-corner="tr"] { top: 0; right: 0; cursor: nesw-resize; }
+.yt-mini-resize[data-corner="bl"] { bottom: 0; left: 0; cursor: nesw-resize; }
+
+.yt-mini-resize[data-corner="tl"]::after { top: 4px; left: 4px; border-top-width: 2px; border-left-width: 2px; }
+.yt-mini-resize[data-corner="br"]::after { bottom: 4px; right: 4px; border-bottom-width: 2px; border-right-width: 2px; }
+.yt-mini-resize[data-corner="tr"]::after { top: 4px; right: 4px; border-top-width: 2px; border-right-width: 2px; }
+.yt-mini-resize[data-corner="bl"]::after { bottom: 4px; left: 4px; border-bottom-width: 2px; border-left-width: 2px; }
+
+/* The top-right handle sits under the play/close buttons — keep the buttons clickable */
+.yt-mini-controls {
+  z-index: 3;
+  top: 8px;
+  right: 24px;
 }

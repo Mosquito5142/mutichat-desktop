@@ -37,12 +37,9 @@
 
       <!-- Quick Action Controls -->
       <div class="top-actions">
-        <button id="btn-toggle-auto-reply" class="action-btn auto-reply-btn" title="เปิด/ปิด โหมดตอบกลับอัตโนมัติ (ไม่อยู่หน้าจอ)">
-          <i class="fa-solid fa-robot"></i>
-          <span>ตอบไม่อยู่หน้าจอ</span>
-        </button>
-        <button id="btn-settings-auto-reply" class="action-btn" title="ตั้งค่าข้อความตอบกลับอัตโนมัติ (Away Mode)">
-          <i class="fa-solid fa-sliders"></i>
+        <button id="btn-youtube" class="action-btn youtube-btn" title="เปิด/ซ่อน YouTube ไม่มีโฆษณา (Ctrl+Shift+Y)">
+          <i class="fa-brands fa-youtube"></i>
+          <span>YouTube</span>
         </button>
         <button id="btn-mode-grid" class="action-btn active" title="แสดงทุกบัญชีแบบแบ่งหน้าจอ (Grid View)">
           <i class="fa-solid fa-table-cells-large"></i>
@@ -59,20 +56,37 @@
       </div>
     </header>
 
-    <!-- Away Mode Active Banner Indicator -->
-    <div id="away-mode-banner" class="away-mode-banner hidden">
-      <div class="banner-content">
-        <i class="fa-solid fa-robot pulse-icon"></i>
-        <span><strong>โหมดไม่อยู่หน้าจอกำลังทำงาน:</strong> ระบบจะเฝ้าตอบแชทและส่งลิงก์เพจหลักให้ลูกค้าอัตโนมัติ</span>
-      </div>
-      <button id="btn-banner-off" class="btn-banner-off"><i class="fa-solid fa-power-off"></i> ปิดโหมดนี้</button>
-    </div>
-
     <!-- Main Content Area with Dynamic Webviews Container and Sidebar -->
     <main class="main-content">
       <!-- Dynamic Panes Container -->
       <div id="chat-container" class="chat-container mode-grid">
         <!-- Account Webview Panes will be dynamically injected here -->
+      </div>
+
+      <!-- YouTube Floating View (on top of chats, never takes a grid column) -->
+      <div id="youtube-view" class="youtube-view hidden">
+        <div class="youtube-view-header">
+          <div class="yt-nav">
+            <button id="btn-yt-back" class="pane-btn" title="ย้อนกลับ"><i class="fa-solid fa-arrow-left"></i></button>
+            <button id="btn-yt-forward" class="pane-btn" title="ไปข้างหน้า"><i class="fa-solid fa-arrow-right"></i></button>
+            <button id="btn-yt-home" class="pane-btn" title="หน้าแรก YouTube"><i class="fa-solid fa-house"></i></button>
+          </div>
+          <span class="yt-title"><i class="fa-brands fa-youtube"></i> YouTube ไม่มีโฆษณา</span>
+          <button id="btn-yt-close" class="pane-btn danger" title="ปิด YouTube (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i> ปิด</button>
+        </div>
+        <div id="youtube-webview-host" class="youtube-webview-host"></div>
+        <!-- Mini player overlay: webviews swallow mouse events, so drag/click is caught here -->
+        <div id="yt-mini-overlay" class="yt-mini-overlay" title="คลิกเพื่อกลับไปดูเต็มจอ / ลากเพื่อย้ายตำแหน่ง / ลากมุมเพื่อย่อขยาย">
+          <div class="yt-mini-controls">
+            <button id="btn-yt-mini-play" class="yt-mini-btn" title="เล่น / หยุด"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i></button>
+            <button id="btn-yt-mini-close" class="yt-mini-btn" title="ปิด YouTube (คืน RAM)"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <span class="yt-mini-hint"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> คลิกเพื่อดูต่อ</span>
+          <div class="yt-mini-resize" data-corner="tl" title="ลากเพื่อย่อ/ขยาย"></div>
+          <div class="yt-mini-resize" data-corner="tr" title="ลากเพื่อย่อ/ขยาย"></div>
+          <div class="yt-mini-resize" data-corner="bl" title="ลากเพื่อย่อ/ขยาย"></div>
+          <div class="yt-mini-resize" data-corner="br" title="ลากเพื่อย่อ/ขยาย"></div>
+        </div>
       </div>
 
       <!-- Quick Reply Seller Sidebar -->
@@ -88,6 +102,15 @@
           <button id="btn-add-quick-reply" class="add-snippet-btn">
             <i class="fa-solid fa-plus"></i> เพิ่มข้อความใหม่
           </button>
+          <div class="snippet-io-actions">
+            <button id="btn-export-snippets" class="snippet-io-btn" title="บันทึกข้อความตอบด่วนทั้งหมดเป็นไฟล์ (ใช้แทน default-snippets.json ตอนบิ้วได้)">
+              <i class="fa-solid fa-file-export"></i> ส่งออก
+            </button>
+            <button id="btn-import-snippets" class="snippet-io-btn" title="นำเข้าข้อความตอบด่วนจากไฟล์">
+              <i class="fa-solid fa-file-import"></i> นำเข้า
+            </button>
+            <input type="file" id="input-import-snippets" accept=".json,application/json" hidden />
+          </div>
         </div>
 
         <!-- Quick Reply Snippet Items List -->
@@ -164,43 +187,6 @@
       <div class="modal-footer">
         <button id="btn-cancel-snippet" class="btn-secondary">ยกเลิก</button>
         <button id="btn-save-snippet" class="btn-primary">บันทึกข้อความ</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal for Auto Reply Settings (Away Mode) -->
-  <div id="auto-reply-modal" class="modal-overlay hidden">
-    <div class="modal-box" style="max-width: 520px;">
-      <div class="modal-header">
-        <h4><i class="fa-solid fa-robot text-primary"></i> ตั้งค่าโหมดตอบกลับอัตโนมัติ (Away Mode)</h4>
-        <button id="btn-close-auto-reply-modal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 12px; border-radius: 8px;">
-          <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0;">
-            <span style="font-size: 14px; font-weight: 600; color: #34d399;"><i class="fa-solid fa-power-off"></i> เปิดใช้งานโหมดไม่อยู่หน้าจอ</span>
-            <input type="checkbox" id="toggle-auto-reply-active" style="width: 20px; height: 20px; cursor: pointer; accent-color: #10b981;">
-          </label>
-        </div>
-        <div class="form-group">
-          <label>ข้อความตอบกลับอัตโนมัติ (ที่จะส่งเมื่อมีคนทักแชทมา)</label>
-          <textarea id="input-auto-reply-message" rows="5" placeholder="พิมพ์ข้อความที่ต้องการส่งตอบลูกค้าอัตโนมัติ..." style="width:100%; background:#111827; border:1px solid #374151; border-radius:6px; padding:10px; color:#fff; font-size:13px; outline:none; resize:vertical; line-height: 1.5;"></textarea>
-        </div>
-        <div class="form-group">
-          <label><i class="fa-solid fa-clock"></i> Cooldown (นาที) ป้องกันส่งซ้ำใส่ลูกค้าเดิม</label>
-          <input type="number" id="input-auto-reply-cooldown" value="30" min="1" max="1440" style="width:100%; background:#111827; border:1px solid #374151; border-radius:6px; padding:8px 10px; color:#fff; font-size:13px; outline:none;" />
-          <span style="font-size: 11px; color: #9ca3af; margin-top: 4px; display: block;">ระบบจะไม่ส่งข้อความตอบกลับใส่ลูกค้าคนเดิมซ้ำภายในเวลาที่กำหนด</span>
-        </div>
-        <div class="form-group">
-          <label><i class="fa-solid fa-display"></i> เลือกจอที่ต้องการให้ตอบกลับอัตโนมัติ (ปิดเฉพาะจอที่เป็นเพจหลักได้)</label>
-          <div id="auto-reply-accounts-list" style="display: flex; flex-direction: column; gap: 8px; background: #111827; border: 1px solid #374151; border-radius: 6px; padding: 10px; max-height: 140px; overflow-y: auto;">
-            <!-- Dynamic account checkboxes will be inserted here -->
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="btn-cancel-auto-reply" class="btn-secondary">ยกเลิก</button>
-        <button id="btn-save-auto-reply" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> บันทึกตั้งค่า</button>
       </div>
     </div>
   </div>
