@@ -17,8 +17,22 @@ app.on('second-instance', () => {
   }
 });
 
-// Set a dedicated custom userData directory to avoid SQLite file locking & QuotaDB IO errors on Windows
-const customUserDataDir = path.join(app.getPath('userData'), 'MultiChat_Data_Store');
+// Set a dedicated custom userData directory to avoid SQLite file locking & QuotaDB IO errors on Windows.
+// The default userData folder is named after the app, which differs between `npm start`, the packager
+// build and the installer build — pin it so every build shares the same logins and quick replies.
+const DATA_STORE_NAME = 'MultiChat_Data_Store';
+function resolveDataStoreDir() {
+  const appData = app.getPath('appData');
+  // This build's own folder first (unchanged behaviour), then the names other builds use
+  const candidates = [...new Set([
+    app.getPath('userData'),
+    path.join(appData, 'multi-account-messenger'),
+    path.join(appData, 'Multi-Chat Messenger'),
+    path.join(appData, 'Multi-Chat-Messenger')
+  ])].map(base => path.join(base, DATA_STORE_NAME));
+  return candidates.find(dir => fs.existsSync(dir)) || candidates[0];
+}
+const customUserDataDir = resolveDataStoreDir();
 if (!fs.existsSync(customUserDataDir)) {
   fs.mkdirSync(customUserDataDir, { recursive: true });
 }
@@ -101,11 +115,28 @@ const CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit
 app.on('web-contents-created', (event, contents) => {
   // Ctrl+Shift+Y toggles YouTube even when a chat/YouTube webview has keyboard focus
   contents.on('before-input-event', (e, input) => {
-    if (input.type === 'keyDown' && input.control && input.shift && input.key.toLowerCase() === 'y') {
+    if (input.type !== 'keyDown' || !input.control) return;
+    if (input.shift && input.key.toLowerCase() === 'y') {
       e.preventDefault();
       if (mainWindow) mainWindow.webContents.send('toggle-youtube');
+      return;
+    }
+    // Ctrl + / Ctrl - / Ctrl 0 zoom the pane that has focus (handled per account in the renderer)
+    if (contents.getType() === 'webview') {
+      const zoomAction = { '=': 'in', '+': 'in', '-': 'out', '_': 'out', '0': 'reset' }[input.key];
+      if (zoomAction) {
+        e.preventDefault();
+        if (mainWindow) mainWindow.webContents.send('zoom-pane', contents.id, zoomAction);
+      }
     }
   });
+
+  // Ctrl + mouse wheel / touchpad pinch
+  if (contents.getType() === 'webview') {
+    contents.on('zoom-changed', (e, direction) => {
+      if (mainWindow) mainWindow.webContents.send('zoom-pane', contents.id, direction);
+    });
+  }
 
   if (contents.getType() === 'webview') {
     contents.setUserAgent(CHROME_USER_AGENT);

@@ -5,17 +5,38 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "npx electron-packager . Multi-Chat-Messenger --platform=win32 --arch=x64 --out=dist --overwrite"
+    "build": "npx electron-packager . Multi-Chat-Messenger --platform=win32 --arch=x64 --out=dist --overwrite --ignore=\"node_modules/@fortawesome/fontawesome-free/(svgs|sprites|js|less|scss|metadata)\"",
+    "dist": "electron-builder --win nsis --x64"
   },
   "build": {
     "appId": "com.antigravity.multichat",
     "productName": "Multi-Chat Messenger",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "renderer.js",
+      "yt-preload.js",
+      "index.html",
+      "styles.css",
+      "default-snippets.json",
+      "package.json",
+      "node_modules/@fontsource/prompt/**/*",
+      "node_modules/@fortawesome/fontawesome-free/css/**/*",
+      "node_modules/@fortawesome/fontawesome-free/webfonts/**/*",
+      "node_modules/@fortawesome/fontawesome-free/LICENSE.txt"
+    ],
     "win": {
       "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Multi-Chat Messenger",
+      "artifactName": "Multi-Chat-Messenger-Setup-${version}.exe"
     }
   },
   "keywords": [
@@ -30,5 +51,9 @@
   "devDependencies": {
     "electron": "^31.2.0",
     "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "@fontsource/prompt": "^5.3.0",
+    "@fortawesome/fontawesome-free": "6.4.0"
   }
 }

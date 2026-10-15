@@ -1047,3 +1047,24 @@ body.mc-resizing .yt-mini-resize {
   top: 8px;
   right: 24px;
 }
+
+/* Per-pane zoom badge (shown only when not 100%) */
+.pane-zoom-badge {
+  background: #1e3a8a;
+  border: 1px solid #3b82f6;
+  color: #bfdbfe;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pane-zoom-badge:hover {
+  background: #2563eb;
+  color: #fff;
+}
+
+.pane-zoom-badge.hidden {
+  display: none;
+}
