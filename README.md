@@ -71,6 +71,7 @@ npm run dist
 
 จะได้ไฟล์ติดตั้งไฟล์เดียวที่ `dist/Multi-Chat-Messenger-Setup-1.0.0.exe` ดับเบิลคลิกติดตั้งได้เลย มีไอคอนบน Desktop และ Start Menu
 (ต้องรันบน Windows) ข้อมูล login และข้อความตอบด่วนใช้ชุดเดียวกับแบบโฟลเดอร์ เปลี่ยนไปใช้ตัวติดตั้งแล้วไม่ต้อง login ใหม่
+ไม่ต้องรันแบบ Administrator (ปิดขั้นเซ็นโค้ดไว้ จึงไม่เจอ error `Cannot create symbolic link`)
 
 ---
 

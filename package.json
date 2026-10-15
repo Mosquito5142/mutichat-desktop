@@ -28,7 +28,8 @@
       "node_modules/@fortawesome/fontawesome-free/LICENSE.txt"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
