@@ -1005,3 +1005,45 @@ body.mc-dragging webview {
 body.mc-dragging .yt-mini-overlay {
   cursor: grabbing;
 }
+
+/* Mini player corner resize handles */
+.yt-mini-resize {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.yt-mini-overlay:hover .yt-mini-resize,
+body.mc-resizing .yt-mini-resize {
+  opacity: 1;
+}
+
+.yt-mini-resize::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: #f1f5f9;
+  border-style: solid;
+  border-width: 0;
+}
+
+.yt-mini-resize[data-corner="tl"] { top: 0; left: 0; cursor: nwse-resize; }
+.yt-mini-resize[data-corner="br"] { bottom: 0; right: 0; cursor: nwse-resize; }
+.yt-mini-resize[data-corner="tr"] { top: 0; right: 0; cursor: nesw-resize; }
+.yt-mini-resize[data-corner="bl"] { bottom: 0; left: 0; cursor: nesw-resize; }
+
+.yt-mini-resize[data-corner="tl"]::after { top: 4px; left: 4px; border-top-width: 2px; border-left-width: 2px; }
+.yt-mini-resize[data-corner="br"]::after { bottom: 4px; right: 4px; border-bottom-width: 2px; border-right-width: 2px; }
+.yt-mini-resize[data-corner="tr"]::after { top: 4px; right: 4px; border-top-width: 2px; border-right-width: 2px; }
+.yt-mini-resize[data-corner="bl"]::after { bottom: 4px; left: 4px; border-bottom-width: 2px; border-left-width: 2px; }
+
+/* The top-right handle sits under the play/close buttons — keep the buttons clickable */
+.yt-mini-controls {
+  z-index: 3;
+  top: 8px;
+  right: 24px;
+}

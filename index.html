@@ -76,12 +76,16 @@
         </div>
         <div id="youtube-webview-host" class="youtube-webview-host"></div>
         <!-- Mini player overlay: webviews swallow mouse events, so drag/click is caught here -->
-        <div id="yt-mini-overlay" class="yt-mini-overlay" title="คลิกเพื่อกลับไปดูเต็มจอ / ลากเพื่อย้ายตำแหน่ง">
+        <div id="yt-mini-overlay" class="yt-mini-overlay" title="คลิกเพื่อกลับไปดูเต็มจอ / ลากเพื่อย้ายตำแหน่ง / ลากมุมเพื่อย่อขยาย">
           <div class="yt-mini-controls">
             <button id="btn-yt-mini-play" class="yt-mini-btn" title="เล่น / หยุด"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i></button>
             <button id="btn-yt-mini-close" class="yt-mini-btn" title="ปิด YouTube (คืน RAM)"><i class="fa-solid fa-xmark"></i></button>
           </div>
           <span class="yt-mini-hint"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> คลิกเพื่อดูต่อ</span>
+          <div class="yt-mini-resize" data-corner="tl" title="ลากเพื่อย่อ/ขยาย"></div>
+          <div class="yt-mini-resize" data-corner="tr" title="ลากเพื่อย่อ/ขยาย"></div>
+          <div class="yt-mini-resize" data-corner="bl" title="ลากเพื่อย่อ/ขยาย"></div>
+          <div class="yt-mini-resize" data-corner="br" title="ลากเพื่อย่อ/ขยาย"></div>
         </div>
       </div>
 

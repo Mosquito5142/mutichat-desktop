@@ -495,7 +495,10 @@ const youtubeHost = document.getElementById('youtube-webview-host');
 const ytMiniOverlay = document.getElementById('yt-mini-overlay');
 const btnYoutube = document.getElementById('btn-youtube');
 const YT_MINI_POS_KEY = 'yt_mini_pos';
+const YT_MINI_SIZE_KEY = 'yt_mini_width';
 const YT_MINI_MARGIN = 16;
+const YT_MINI_MIN_WIDTH = 240;
+const YT_MINI_DEFAULT_WIDTH = 384;
 const lastUnreadMap = {};
 let ytWebview = null;
 let ytMode = 'closed';
@@ -515,7 +518,12 @@ function setYoutubeMode(mode) {
   youtubeView.classList.toggle('yt-mini', mode === 'mini');
   if (mode !== 'full') youtubeView.classList.remove('yt-fullscreen');
   if (mode === 'mini') placeMiniPlayer();
-  else { youtubeView.style.left = ''; youtubeView.style.top = ''; }
+  else {
+    youtubeView.style.left = '';
+    youtubeView.style.top = '';
+    youtubeView.style.width = '';
+    youtubeView.style.height = '';
+  }
   sendToYoutube('mc-mini', mode === 'mini');
   btnYoutube.classList.toggle('active', mode === 'full');
   btnYoutube.classList.toggle('yt-alive', mode === 'mini' || mode === 'hidden');
@@ -614,7 +622,20 @@ function clampMiniPos(left, top) {
   };
 }
 
+// Mini player is always 16:9; width is capped so it never outgrows the window
+function setMiniWidth(width) {
+  const maxWidth = Math.max(YT_MINI_MIN_WIDTH, Math.min(window.innerWidth - YT_MINI_MARGIN * 2, (window.innerHeight - YT_MINI_MARGIN * 2) * 16 / 9));
+  const w = Math.round(Math.max(YT_MINI_MIN_WIDTH, Math.min(width, maxWidth)));
+  youtubeView.style.width = `${w}px`;
+  youtubeView.style.height = `${Math.round(w * 9 / 16)}px`;
+  return w;
+}
+
 function placeMiniPlayer() {
+  let savedWidth = null;
+  try { savedWidth = parseInt(localStorage.getItem(YT_MINI_SIZE_KEY), 10); } catch (e) {}
+  setMiniWidth(savedWidth || YT_MINI_DEFAULT_WIDTH);
+
   let pos = null;
   try { pos = JSON.parse(localStorage.getItem(YT_MINI_POS_KEY)); } catch (e) {}
   // Default: bottom-right corner (Infinity gets clamped to the edge)
@@ -626,7 +647,7 @@ function placeMiniPlayer() {
 window.addEventListener('resize', () => { if (ytMode === 'mini') placeMiniPlayer(); });
 
 ytMiniOverlay.addEventListener('mousedown', (e) => {
-  if (e.button !== 0 || e.target.closest('button')) return;
+  if (e.button !== 0 || e.target.closest('button, .yt-mini-resize')) return;
   e.preventDefault();
   const startX = e.clientX;
   const startY = e.clientY;
@@ -659,6 +680,53 @@ ytMiniOverlay.addEventListener('mousedown', (e) => {
   };
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
+});
+
+// Resize by dragging a corner; the opposite corner stays put
+ytMiniOverlay.querySelectorAll('.yt-mini-resize').forEach((handle) => {
+  handle.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const corner = handle.dataset.corner; // tl | tr | bl | br
+    const fromLeft = corner.includes('l');
+    const fromTop = corner.includes('t');
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const start = youtubeView.getBoundingClientRect();
+    document.body.classList.add('mc-dragging', 'mc-resizing');
+
+    const onMove = (ev) => {
+      const dx = (ev.clientX - startX) * (fromLeft ? -1 : 1);
+      const dy = (ev.clientY - startY) * (fromTop ? -1 : 1);
+      // Follow whichever direction the mouse moved more (in 16:9 terms)
+      let width = setMiniWidth(start.width + Math.max(dx, dy * 16 / 9));
+      let left = fromLeft ? start.right - width : start.left;
+      let top = fromTop ? start.bottom - width * 9 / 16 : start.top;
+      // Stop growing past the window edge on the side being dragged
+      const overX = fromLeft ? YT_MINI_MARGIN - left : left + width - (window.innerWidth - YT_MINI_MARGIN);
+      const overY = fromTop ? YT_MINI_MARGIN - top : top + width * 9 / 16 - (window.innerHeight - YT_MINI_MARGIN);
+      const over = Math.max(0, overX, overY * 16 / 9);
+      if (over > 0) {
+        width = setMiniWidth(width - over);
+        left = fromLeft ? start.right - width : start.left;
+        top = fromTop ? start.bottom - width * 9 / 16 : start.top;
+      }
+      youtubeView.style.left = `${Math.round(left)}px`;
+      youtubeView.style.top = `${Math.round(top)}px`;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.classList.remove('mc-dragging', 'mc-resizing');
+      try {
+        localStorage.setItem(YT_MINI_SIZE_KEY, String(youtubeView.offsetWidth));
+        localStorage.setItem(YT_MINI_POS_KEY, JSON.stringify({ left: youtubeView.offsetLeft, top: youtubeView.offsetTop }));
+      } catch (err) {}
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
 });
 
 document.getElementById('btn-yt-mini-play').addEventListener('click', () => {
