@@ -1,4 +1,10 @@
 const { clipboard, ipcRenderer } = require('electron');
+const path = require('path');
+const { pathToFileURL } = require('url');
+
+// YouTube ad-free + low-resource preload (only attached to YouTube panes)
+const YT_PRELOAD_URL = pathToFileURL(path.join(__dirname, 'yt-preload.js')).href;
+const YT_PARTITION = 'persist:youtube';
 
 // DOM Elements
 const chatContainer = document.getElementById('chat-container');
@@ -63,6 +69,11 @@ const PLATFORM_CONFIG = {
     name: 'Shopee Chat',
     icon: '<i class="fa-solid fa-bag-shopping" style="color:#f97316;"></i>',
     url: 'https://seller.shopee.co.th/webchat'
+  },
+  youtube: {
+    name: 'YouTube (ไม่มีโฆษณา)',
+    icon: '<i class="fa-brands fa-youtube" style="color:#ef4444;"></i>',
+    url: 'https://www.youtube.com/'
   },
   custom: {
     name: 'Custom Web',
@@ -160,6 +171,7 @@ function initAccounts() {
       pane.className = `chat-pane ${activeAccountId === acc.id ? 'active-pane' : ''}`;
       pane.id = `pane-acc-${acc.id}`;
       const iconHtml = getPlatformIcon(acc.platform);
+      const isYoutube = acc.platform === 'youtube';
 
       pane.innerHTML = `
         <div class="pane-header acc1-header" draggable="true" data-acc-id="${acc.id}">
@@ -169,8 +181,9 @@ function initAccounts() {
             <span id="status-acc-${acc.id}" class="acc-status loading"><i class="fa-solid fa-spinner fa-spin"></i></span>
           </div>
           <div class="pane-controls">
-            ${acc.id !== 1 ? `<button class="pane-btn" onclick="toggleShareSession(${acc.id})" title="${acc.partition === 'persist:account1' ? '🔗 กำลังแชร์ Cookie กับจอที่ 1 (ไม่ต้องล็อกอินซ้ำ)' : '🔒 แยก Cookie (คลิกเพื่อแชร์ Cookie กับจอที่ 1)'}" id="session-acc-${acc.id}"><i class="fa-solid fa-link" style="${acc.partition === 'persist:account1' ? 'color:#60a5fa;' : 'opacity:0.4;'}"></i></button>` : ''}
-            <button class="pane-btn" onclick="toggleAccAutoReply(${acc.id})" title="เปิด/ปิด ตอบกลับอัตโนมัติเฉพาะจอนี้" id="autoreply-acc-${acc.id}"><i class="fa-solid fa-robot"></i></button>
+            ${isYoutube ? `<button class="pane-btn" onclick="toggleSleep(${acc.id})" title="พักจอ (คืน RAM) / ปลุกจอ" id="sleep-acc-${acc.id}"><i class="fa-solid fa-moon"></i></button>` : ''}
+            ${acc.id !== 1 && !isYoutube ? `<button class="pane-btn" onclick="toggleShareSession(${acc.id})" title="${acc.partition === 'persist:account1' ? '🔗 กำลังแชร์ Cookie กับจอที่ 1 (ไม่ต้องล็อกอินซ้ำ)' : '🔒 แยก Cookie (คลิกเพื่อแชร์ Cookie กับจอที่ 1)'}" id="session-acc-${acc.id}"><i class="fa-solid fa-link" style="${acc.partition === 'persist:account1' ? 'color:#60a5fa;' : 'opacity:0.4;'}"></i></button>` : ''}
+            ${!isYoutube ? `<button class="pane-btn" onclick="toggleAccAutoReply(${acc.id})" title="เปิด/ปิด ตอบกลับอัตโนมัติเฉพาะจอนี้" id="autoreply-acc-${acc.id}"><i class="fa-solid fa-robot"></i></button>` : ''}
             <button class="pane-btn" onclick="reloadWebview(${acc.id})" title="โหลดใหม่"><i class="fa-solid fa-rotate-right"></i></button>
             <button class="pane-btn" onclick="goHome(${acc.id})" title="หน้าหลัก"><i class="fa-solid fa-house"></i></button>
             <button class="pane-btn" onclick="toggleMute(${acc.id})" title="เปิด/ปิดเสียง" id="mute-acc-${acc.id}"><i class="fa-solid fa-volume-high"></i></button>
@@ -183,6 +196,7 @@ function initAccounts() {
             src="${acc.url || 'https://www.messenger.com/'}" 
             partition="${acc.partition}"
             useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            ${isYoutube ? `preload="${YT_PRELOAD_URL}"` : ''}
             allowpopups>
           </webview>
         </div>
@@ -313,7 +327,9 @@ btnSaveAccount.addEventListener('click', () => {
 
   const accounts = getAccounts();
   const newId = Date.now();
-  const targetPartition = sessionChoice === 'shared_main' ? 'persist:account1' : `persist:account_${newId}`;
+  let targetPartition = sessionChoice === 'shared_main' ? 'persist:account1' : `persist:account_${newId}`;
+  // YouTube always uses its own session so the ad blocker never touches chat sessions
+  if (platform === 'youtube') targetPartition = YT_PARTITION;
 
   const newAccount = {
     id: newId,
@@ -390,7 +406,31 @@ function reloadWebview(accId) {
 
 function goHome(accId) {
   const wv = document.getElementById(`webview-${accId}`);
-  if (wv) wv.loadURL('https://www.messenger.com/');
+  const acc = getAccounts().find(a => a.id === accId);
+  if (wv) wv.loadURL(acc?.url || 'https://www.messenger.com/');
+}
+
+// Sleep / wake a pane: unloading the page frees its renderer RAM
+const sleepStateMap = {};
+
+function toggleSleep(accId) {
+  const wv = document.getElementById(`webview-${accId}`);
+  const btn = document.getElementById(`sleep-acc-${accId}`);
+  if (!wv) return;
+
+  if (!sleepStateMap[accId]) {
+    sleepStateMap[accId] = wv.getURL();
+    wv.loadURL('about:blank');
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-sun" style="color:#facc15;"></i>';
+    showToast('พักจอแล้ว (คืน RAM) — กดอีกครั้งเพื่อปลุกจอ');
+  } else {
+    const acc = getAccounts().find(a => a.id === accId);
+    const resumeUrl = sleepStateMap[accId].startsWith('http') ? sleepStateMap[accId] : (acc?.url || 'https://www.youtube.com/');
+    delete sleepStateMap[accId];
+    wv.loadURL(resumeUrl);
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+    showToast('ปลุกจอแล้ว');
+  }
 }
 
 function switchUrl(accId, mode) {
@@ -424,6 +464,7 @@ function toggleMute(accId) {
 window.switchUrl = switchUrl;
 window.reloadWebview = reloadWebview;
 window.goHome = goHome;
+window.toggleSleep = toggleSleep;
 window.toggleMute = toggleMute;
 
 // Setup Webview Listeners
@@ -795,7 +836,7 @@ function openAutoReplyModal() {
   if (accountsListEl) {
     accountsListEl.innerHTML = '';
     const accounts = getAccounts();
-    accounts.forEach(acc => {
+    accounts.filter(acc => acc.platform !== 'youtube').forEach(acc => {
       const isChecked = !disabledIds.includes(acc.id);
       const iconHtml = getPlatformIcon(acc.platform);
       const row = document.createElement('label');
@@ -852,7 +893,7 @@ setInterval(() => {
   const accounts = getAccounts();
 
   accounts.forEach(acc => {
-    if (disabledIds.includes(acc.id)) return;
+    if (disabledIds.includes(acc.id) || acc.platform === 'youtube') return;
 
     const wv = document.getElementById(`webview-${acc.id}`);
     if (!wv || typeof wv.executeJavaScript !== 'function') return;

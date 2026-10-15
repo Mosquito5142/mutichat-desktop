@@ -110,12 +110,34 @@ app.on('web-contents-created', (event, contents) => {
   }
 });
 
+// Network-level ad blocking for the YouTube session only (chat sessions untouched).
+// The `urls` filter means the callback runs only for matching requests, so it costs nothing elsewhere.
+const YT_AD_URL_PATTERNS = [
+  '*://*.doubleclick.net/*',
+  '*://*.googlesyndication.com/*',
+  '*://*.googleadservices.com/*',
+  '*://www.youtube.com/pagead/*',
+  '*://www.youtube.com/api/stats/ads*',
+  '*://www.youtube.com/ptracking*',
+  '*://*.youtube.com/get_midroll_*'
+];
+
+function setupYoutubeAdBlock() {
+  const ytSession = session.fromPartition('persist:youtube');
+  ytSession.setUserAgent(CHROME_USER_AGENT);
+  ytSession.webRequest.onBeforeRequest({ urls: YT_AD_URL_PATTERNS }, (details, callback) => {
+    callback({ cancel: true });
+  });
+}
+
 app.whenReady().then(() => {
   // Override User-Agent on all sessions dynamically
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     details.requestHeaders['User-Agent'] = CHROME_USER_AGENT;
     callback({ requestHeaders: details.requestHeaders });
   });
+
+  setupYoutubeAdBlock();
 
   createWindow();
 
