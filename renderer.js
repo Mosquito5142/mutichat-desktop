@@ -5,6 +5,7 @@ const { pathToFileURL } = require('url');
 // YouTube ad-free + low-resource preload (only attached to YouTube panes)
 const YT_PRELOAD_URL = pathToFileURL(path.join(__dirname, 'yt-preload.js')).href;
 const YT_PARTITION = 'persist:youtube';
+const YT_LAST_URL_KEY = 'yt_last_url';
 
 // DOM Elements
 const chatContainer = document.getElementById('chat-container');
@@ -121,6 +122,12 @@ function getAccounts() {
     }
     return acc;
   });
+  // YouTube moved out of the grid into its own floating view (login kept: same persist:youtube session)
+  if (list.some(acc => acc.platform === 'youtube')) {
+    list = list.filter(acc => acc.platform !== 'youtube');
+    if (list.length === 0) list = DEFAULT_ACCOUNTS.slice();
+    updated = true;
+  }
   if (updated) saveAccounts(list);
   return list;
 }
@@ -171,7 +178,6 @@ function initAccounts() {
       pane.className = `chat-pane ${activeAccountId === acc.id ? 'active-pane' : ''}`;
       pane.id = `pane-acc-${acc.id}`;
       const iconHtml = getPlatformIcon(acc.platform);
-      const isYoutube = acc.platform === 'youtube';
 
       pane.innerHTML = `
         <div class="pane-header acc1-header" draggable="true" data-acc-id="${acc.id}">
@@ -181,9 +187,8 @@ function initAccounts() {
             <span id="status-acc-${acc.id}" class="acc-status loading"><i class="fa-solid fa-spinner fa-spin"></i></span>
           </div>
           <div class="pane-controls">
-            ${isYoutube ? `<button class="pane-btn" onclick="toggleSleep(${acc.id})" title="พักจอ (คืน RAM) / ปลุกจอ" id="sleep-acc-${acc.id}"><i class="fa-solid fa-moon"></i></button>` : ''}
-            ${acc.id !== 1 && !isYoutube ? `<button class="pane-btn" onclick="toggleShareSession(${acc.id})" title="${acc.partition === 'persist:account1' ? '🔗 กำลังแชร์ Cookie กับจอที่ 1 (ไม่ต้องล็อกอินซ้ำ)' : '🔒 แยก Cookie (คลิกเพื่อแชร์ Cookie กับจอที่ 1)'}" id="session-acc-${acc.id}"><i class="fa-solid fa-link" style="${acc.partition === 'persist:account1' ? 'color:#60a5fa;' : 'opacity:0.4;'}"></i></button>` : ''}
-            ${!isYoutube ? `<button class="pane-btn" onclick="toggleAccAutoReply(${acc.id})" title="เปิด/ปิด ตอบกลับอัตโนมัติเฉพาะจอนี้" id="autoreply-acc-${acc.id}"><i class="fa-solid fa-robot"></i></button>` : ''}
+            ${acc.id !== 1 ? `<button class="pane-btn" onclick="toggleShareSession(${acc.id})" title="${acc.partition === 'persist:account1' ? '🔗 กำลังแชร์ Cookie กับจอที่ 1 (ไม่ต้องล็อกอินซ้ำ)' : '🔒 แยก Cookie (คลิกเพื่อแชร์ Cookie กับจอที่ 1)'}" id="session-acc-${acc.id}"><i class="fa-solid fa-link" style="${acc.partition === 'persist:account1' ? 'color:#60a5fa;' : 'opacity:0.4;'}"></i></button>` : ''}
+            <button class="pane-btn" onclick="toggleAccAutoReply(${acc.id})" title="เปิด/ปิด ตอบกลับอัตโนมัติเฉพาะจอนี้" id="autoreply-acc-${acc.id}"><i class="fa-solid fa-robot"></i></button>
             <button class="pane-btn" onclick="reloadWebview(${acc.id})" title="โหลดใหม่"><i class="fa-solid fa-rotate-right"></i></button>
             <button class="pane-btn" onclick="goHome(${acc.id})" title="หน้าหลัก"><i class="fa-solid fa-house"></i></button>
             <button class="pane-btn" onclick="toggleMute(${acc.id})" title="เปิด/ปิดเสียง" id="mute-acc-${acc.id}"><i class="fa-solid fa-volume-high"></i></button>
@@ -196,7 +201,6 @@ function initAccounts() {
             src="${acc.url || 'https://www.messenger.com/'}" 
             partition="${acc.partition}"
             useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-            ${isYoutube ? `preload="${YT_PRELOAD_URL}"` : ''}
             allowpopups>
           </webview>
         </div>
@@ -285,12 +289,14 @@ function updateLayoutView() {
 }
 
 function focusAccountTab(accId) {
+  hideYoutube();
   isGridView = false;
   activeAccountId = accId;
   updateLayoutView();
 }
 
 btnModeGrid.addEventListener('click', () => {
+  hideYoutube();
   isGridView = true;
   activeAccountId = null;
   updateLayoutView();
@@ -327,9 +333,7 @@ btnSaveAccount.addEventListener('click', () => {
 
   const accounts = getAccounts();
   const newId = Date.now();
-  let targetPartition = sessionChoice === 'shared_main' ? 'persist:account1' : `persist:account_${newId}`;
-  // YouTube always uses its own session so the ad blocker never touches chat sessions
-  if (platform === 'youtube') targetPartition = YT_PARTITION;
+  const targetPartition = sessionChoice === 'shared_main' ? 'persist:account1' : `persist:account_${newId}`;
 
   const newAccount = {
     id: newId,
@@ -410,29 +414,6 @@ function goHome(accId) {
   if (wv) wv.loadURL(acc?.url || 'https://www.messenger.com/');
 }
 
-// Sleep / wake a pane: unloading the page frees its renderer RAM
-const sleepStateMap = {};
-
-function toggleSleep(accId) {
-  const wv = document.getElementById(`webview-${accId}`);
-  const btn = document.getElementById(`sleep-acc-${accId}`);
-  if (!wv) return;
-
-  if (!sleepStateMap[accId]) {
-    sleepStateMap[accId] = wv.getURL();
-    wv.loadURL('about:blank');
-    if (btn) btn.innerHTML = '<i class="fa-solid fa-sun" style="color:#facc15;"></i>';
-    showToast('พักจอแล้ว (คืน RAM) — กดอีกครั้งเพื่อปลุกจอ');
-  } else {
-    const acc = getAccounts().find(a => a.id === accId);
-    const resumeUrl = sleepStateMap[accId].startsWith('http') ? sleepStateMap[accId] : (acc?.url || 'https://www.youtube.com/');
-    delete sleepStateMap[accId];
-    wv.loadURL(resumeUrl);
-    if (btn) btn.innerHTML = '<i class="fa-solid fa-moon"></i>';
-    showToast('ปลุกจอแล้ว');
-  }
-}
-
 function switchUrl(accId, mode) {
   const wv = document.getElementById(`webview-${accId}`);
   if (!wv) return;
@@ -464,7 +445,6 @@ function toggleMute(accId) {
 window.switchUrl = switchUrl;
 window.reloadWebview = reloadWebview;
 window.goHome = goHome;
-window.toggleSleep = toggleSleep;
 window.toggleMute = toggleMute;
 
 // Setup Webview Listeners
@@ -482,6 +462,9 @@ function setupWebviewEvents(wv, statusEl, accId) {
   wv.addEventListener('page-title-updated', (e) => {
     const unreadMatch = e.title && e.title.match(/\((\d+)\)/);
     const badgeEl = document.getElementById(`badge-acc-${accId}`);
+    const unreadCount = unreadMatch ? parseInt(unreadMatch[1], 10) : 0;
+    if (unreadCount > (lastUnreadMap[accId] || 0)) notifyYoutubeOverlay(accId, unreadCount);
+    lastUnreadMap[accId] = unreadCount;
     
     if (unreadMatch && parseInt(unreadMatch[1], 10) > 0) {
       const count = unreadMatch[1];
@@ -503,6 +486,119 @@ function setupWebviewEvents(wv, statusEl, accId) {
     }
   });
 }
+
+// ===== YouTube Floating View (ad-free) =====
+// Lives on top of the chat area instead of taking a grid column.
+// Hide = keep loaded (instant resume). Close = destroy webview (frees all its RAM).
+const youtubeView = document.getElementById('youtube-view');
+const youtubeHost = document.getElementById('youtube-webview-host');
+const btnYoutube = document.getElementById('btn-youtube');
+const lastUnreadMap = {};
+let ytWebview = null;
+
+function isYoutubeVisible() {
+  return !!ytWebview && !youtubeView.classList.contains('hidden');
+}
+
+function updateYoutubeButton() {
+  btnYoutube.classList.toggle('active', isYoutubeVisible());
+  btnYoutube.classList.toggle('yt-alive', !!ytWebview && !isYoutubeVisible());
+}
+
+function openYoutube() {
+  if (!ytWebview) {
+    let startUrl = PLATFORM_CONFIG.youtube.url;
+    try { startUrl = localStorage.getItem(YT_LAST_URL_KEY) || startUrl; } catch (e) {}
+
+    ytWebview = document.createElement('webview');
+    ytWebview.setAttribute('partition', YT_PARTITION);
+    ytWebview.setAttribute('preload', YT_PRELOAD_URL);
+    ytWebview.setAttribute('useragent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
+    ytWebview.setAttribute('src', startUrl);
+
+    ytWebview.addEventListener('ipc-message', (e) => {
+      if (e.channel === 'mc-open-chat') {
+        const accId = e.args[0];
+        if (getAccounts().some(a => a.id === accId)) focusAccountTab(accId);
+        else hideYoutube();
+      } else if (e.channel === 'mc-toggle-youtube') {
+        hideYoutube();
+      }
+    });
+    // Fill the whole window (over the top bar) while the video is fullscreen
+    ytWebview.addEventListener('enter-html-full-screen', () => youtubeView.classList.add('yt-fullscreen'));
+    ytWebview.addEventListener('leave-html-full-screen', () => youtubeView.classList.remove('yt-fullscreen'));
+
+    youtubeHost.appendChild(ytWebview);
+  }
+  youtubeView.classList.remove('hidden');
+  updateYoutubeButton();
+}
+
+function hideYoutube() {
+  if (!isYoutubeVisible()) return;
+  ytWebview.send('mc-pause');
+  youtubeView.classList.add('hidden');
+  youtubeView.classList.remove('yt-fullscreen');
+  updateYoutubeButton();
+}
+
+async function closeYoutube() {
+  if (!ytWebview) return;
+  const wv = ytWebview;
+  ytWebview = null;
+
+  // Remember the clip and position so reopening resumes where we left off
+  try {
+    const url = new URL(wv.getURL());
+    if (url.hostname.endsWith('youtube.com')) {
+      if (url.pathname === '/watch') {
+        const time = await wv.executeJavaScript(`(document.querySelector('#movie_player video') || {}).currentTime || 0`);
+        if (time > 5) url.searchParams.set('t', `${Math.floor(time)}s`);
+      }
+      localStorage.setItem(YT_LAST_URL_KEY, url.href);
+    }
+  } catch (e) {}
+
+  wv.remove();
+  youtubeView.classList.add('hidden');
+  youtubeView.classList.remove('yt-fullscreen');
+  updateYoutubeButton();
+  showToast('ปิด YouTube แล้ว (คืน RAM) — กดปุ่ม YouTube เพื่อดูต่อจากเดิม');
+}
+
+function toggleYoutube() {
+  if (isYoutubeVisible()) hideYoutube();
+  else openYoutube();
+}
+
+function youtubeNav(action) {
+  if (!ytWebview) return;
+  if (action === 'back' && ytWebview.canGoBack()) ytWebview.goBack();
+  else if (action === 'forward' && ytWebview.canGoForward()) ytWebview.goForward();
+  else if (action === 'home') ytWebview.loadURL(PLATFORM_CONFIG.youtube.url);
+}
+
+// New chat while watching → card on top of the video (drawn inside the YouTube page so it shows in fullscreen too)
+function notifyYoutubeOverlay(accId, count) {
+  if (!isYoutubeVisible()) return;
+  const acc = getAccounts().find(a => a.id === accId);
+  if (!acc) return;
+  ytWebview.send('mc-notify', {
+    accId,
+    name: acc.name,
+    platform: PLATFORM_CONFIG[acc.platform]?.name || 'แชท',
+    count
+  });
+}
+
+btnYoutube.addEventListener('click', toggleYoutube);
+document.getElementById('btn-yt-back').addEventListener('click', () => youtubeNav('back'));
+document.getElementById('btn-yt-forward').addEventListener('click', () => youtubeNav('forward'));
+document.getElementById('btn-yt-home').addEventListener('click', () => youtubeNav('home'));
+document.getElementById('btn-yt-close').addEventListener('click', closeYoutube);
+// Ctrl+Shift+Y works even while a webview has focus (forwarded from main process)
+ipcRenderer.on('toggle-youtube', toggleYoutube);
 
 // Seller Sidebar Toggle
 btnToggleSidebar.addEventListener('click', () => sellerSidebar.classList.toggle('open'));
@@ -836,7 +932,7 @@ function openAutoReplyModal() {
   if (accountsListEl) {
     accountsListEl.innerHTML = '';
     const accounts = getAccounts();
-    accounts.filter(acc => acc.platform !== 'youtube').forEach(acc => {
+    accounts.forEach(acc => {
       const isChecked = !disabledIds.includes(acc.id);
       const iconHtml = getPlatformIcon(acc.platform);
       const row = document.createElement('label');
@@ -893,7 +989,7 @@ setInterval(() => {
   const accounts = getAccounts();
 
   accounts.forEach(acc => {
-    if (disabledIds.includes(acc.id) || acc.platform === 'youtube') return;
+    if (disabledIds.includes(acc.id)) return;
 
     const wv = document.getElementById(`webview-${acc.id}`);
     if (!wv || typeof wv.executeJavaScript !== 'function') return;

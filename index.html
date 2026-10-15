@@ -37,6 +37,10 @@
 
       <!-- Quick Action Controls -->
       <div class="top-actions">
+        <button id="btn-youtube" class="action-btn youtube-btn" title="เปิด/ซ่อน YouTube ไม่มีโฆษณา (Ctrl+Shift+Y)">
+          <i class="fa-brands fa-youtube"></i>
+          <span>YouTube</span>
+        </button>
         <button id="btn-toggle-auto-reply" class="action-btn auto-reply-btn" title="เปิด/ปิด โหมดตอบกลับอัตโนมัติ (ไม่อยู่หน้าจอ)">
           <i class="fa-solid fa-robot"></i>
           <span>ตอบไม่อยู่หน้าจอ</span>
@@ -73,6 +77,20 @@
       <!-- Dynamic Panes Container -->
       <div id="chat-container" class="chat-container mode-grid">
         <!-- Account Webview Panes will be dynamically injected here -->
+      </div>
+
+      <!-- YouTube Floating View (on top of chats, never takes a grid column) -->
+      <div id="youtube-view" class="youtube-view hidden">
+        <div class="youtube-view-header">
+          <div class="yt-nav">
+            <button id="btn-yt-back" class="pane-btn" title="ย้อนกลับ"><i class="fa-solid fa-arrow-left"></i></button>
+            <button id="btn-yt-forward" class="pane-btn" title="ไปข้างหน้า"><i class="fa-solid fa-arrow-right"></i></button>
+            <button id="btn-yt-home" class="pane-btn" title="หน้าแรก YouTube"><i class="fa-solid fa-house"></i></button>
+          </div>
+          <span class="yt-title"><i class="fa-brands fa-youtube"></i> YouTube ไม่มีโฆษณา</span>
+          <button id="btn-yt-close" class="pane-btn danger" title="ปิด YouTube (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i> ปิด</button>
+        </div>
+        <div id="youtube-webview-host" class="youtube-webview-host"></div>
       </div>
 
       <!-- Quick Reply Seller Sidebar -->
@@ -116,7 +134,6 @@
             <option value="line">🟢 LINE Official Account</option>
             <option value="whatsapp">🟢 WhatsApp Web</option>
             <option value="shopee">🔴 Shopee Chat</option>
-            <option value="youtube">▶️ YouTube (ไม่มีโฆษณา)</option>
             <option value="custom">🌐 เว็บไซต์อื่นๆ (Custom URL)</option>
           </select>
         </div>

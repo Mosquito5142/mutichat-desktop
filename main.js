@@ -99,6 +99,14 @@ function createWindow() {
 const CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 app.on('web-contents-created', (event, contents) => {
+  // Ctrl+Shift+Y toggles YouTube even when a chat/YouTube webview has keyboard focus
+  contents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' && input.control && input.shift && input.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      if (mainWindow) mainWindow.webContents.send('toggle-youtube');
+    }
+  });
+
   if (contents.getType() === 'webview') {
     contents.setUserAgent(CHROME_USER_AGENT);
     
