@@ -112,6 +112,25 @@ const HIDE_CSS = `
     display: none !important;
   }
 
+  /* Multi-Chat: mini player shows only the video */
+  html.mc-mini, html.mc-mini body {
+    overflow: hidden !important;
+  }
+  html.mc-mini #movie_player {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2147483646 !important;
+    background: #000 !important;
+  }
+  html.mc-mini .ytp-chrome-bottom,
+  html.mc-mini .ytp-chrome-top,
+  html.mc-mini .ytp-gradient-bottom,
+  html.mc-mini .ytp-gradient-top {
+    display: none !important;
+  }
+
   /* Multi-Chat: new-chat cards on top of the video (also in fullscreen) */
   #mc-notify-stack {
     position: fixed;
@@ -213,6 +232,19 @@ ipcRenderer.on('mc-notify', (_event, info) => {
   card.children[1].textContent = `${info.platform} — แชทใหม่ ${info.count} รายการ`;
   clearTimeout(card._mcTimer);
   card._mcTimer = setTimeout(() => removeCard(card), CARD_LIFETIME_MS);
+});
+
+ipcRenderer.on('mc-mini', (_event, on) => {
+  document.documentElement.classList.toggle('mc-mini', !!on);
+  // Let the player recompute its size for the new layout
+  window.dispatchEvent(new Event('resize'));
+});
+
+ipcRenderer.on('mc-toggle-play', () => {
+  const video = document.querySelector('#movie_player video');
+  if (!video) return;
+  if (video.paused) video.play().catch(() => {});
+  else video.pause();
 });
 
 ipcRenderer.on('mc-pause', () => {

@@ -289,14 +289,14 @@ function updateLayoutView() {
 }
 
 function focusAccountTab(accId) {
-  hideYoutube();
+  leaveYoutube();
   isGridView = false;
   activeAccountId = accId;
   updateLayoutView();
 }
 
 btnModeGrid.addEventListener('click', () => {
-  hideYoutube();
+  leaveYoutube();
   isGridView = true;
   activeAccountId = null;
   updateLayoutView();
@@ -489,20 +489,37 @@ function setupWebviewEvents(wv, statusEl, accId) {
 
 // ===== YouTube Floating View (ad-free) =====
 // Lives on top of the chat area instead of taking a grid column.
-// Hide = keep loaded (instant resume). Close = destroy webview (frees all its RAM).
+// Modes: closed (no webview) | full (over the chat area) | mini (small draggable player, keeps playing)
+//        | hidden (paused, used when leaving a non-video page). Close = destroy webview (frees all its RAM).
 const youtubeView = document.getElementById('youtube-view');
 const youtubeHost = document.getElementById('youtube-webview-host');
+const ytMiniOverlay = document.getElementById('yt-mini-overlay');
 const btnYoutube = document.getElementById('btn-youtube');
+const YT_MINI_POS_KEY = 'yt_mini_pos';
+const YT_MINI_MARGIN = 16;
 const lastUnreadMap = {};
 let ytWebview = null;
+let ytMode = 'closed';
 
-function isYoutubeVisible() {
-  return !!ytWebview && !youtubeView.classList.contains('hidden');
+// webview.send throws until the guest page has fired dom-ready
+function sendToYoutube(channel, ...args) {
+  try { if (ytWebview) ytWebview.send(channel, ...args); } catch (e) {}
 }
 
-function updateYoutubeButton() {
-  btnYoutube.classList.toggle('active', isYoutubeVisible());
-  btnYoutube.classList.toggle('yt-alive', !!ytWebview && !isYoutubeVisible());
+function isYoutubeVisible() {
+  return ytMode === 'full';
+}
+
+function setYoutubeMode(mode) {
+  ytMode = mode;
+  youtubeView.classList.toggle('hidden', mode === 'closed' || mode === 'hidden');
+  youtubeView.classList.toggle('yt-mini', mode === 'mini');
+  if (mode !== 'full') youtubeView.classList.remove('yt-fullscreen');
+  if (mode === 'mini') placeMiniPlayer();
+  else { youtubeView.style.left = ''; youtubeView.style.top = ''; }
+  sendToYoutube('mc-mini', mode === 'mini');
+  btnYoutube.classList.toggle('active', mode === 'full');
+  btnYoutube.classList.toggle('yt-alive', mode === 'mini' || mode === 'hidden');
 }
 
 function openYoutube() {
@@ -520,27 +537,38 @@ function openYoutube() {
       if (e.channel === 'mc-open-chat') {
         const accId = e.args[0];
         if (getAccounts().some(a => a.id === accId)) focusAccountTab(accId);
-        else hideYoutube();
-      } else if (e.channel === 'mc-toggle-youtube') {
-        hideYoutube();
+        else leaveYoutube();
       }
     });
     // Fill the whole window (over the top bar) while the video is fullscreen
     ytWebview.addEventListener('enter-html-full-screen', () => youtubeView.classList.add('yt-fullscreen'));
     ytWebview.addEventListener('leave-html-full-screen', () => youtubeView.classList.remove('yt-fullscreen'));
+    // Keep the "video only" layout across page loads while mini
+    ytWebview.addEventListener('dom-ready', () => sendToYoutube('mc-mini', ytMode === 'mini'));
 
     youtubeHost.appendChild(ytWebview);
   }
-  youtubeView.classList.remove('hidden');
-  updateYoutubeButton();
+  setYoutubeMode('full');
 }
 
-function hideYoutube() {
-  if (!isYoutubeVisible()) return;
-  ytWebview.send('mc-pause');
-  youtubeView.classList.add('hidden');
-  youtubeView.classList.remove('yt-fullscreen');
-  updateYoutubeButton();
+function isWatchingVideo() {
+  try {
+    const { pathname } = new URL(ytWebview.getURL());
+    return pathname === '/watch' || pathname.startsWith('/shorts/') || pathname.startsWith('/live/');
+  } catch (e) {
+    return false;
+  }
+}
+
+// Going to the chats: keep a clip playing in the mini player, otherwise just pause and hide
+function leaveYoutube() {
+  if (ytMode !== 'full') return;
+  if (isWatchingVideo()) {
+    setYoutubeMode('mini');
+  } else {
+    sendToYoutube('mc-pause');
+    setYoutubeMode('hidden');
+  }
 }
 
 async function closeYoutube() {
@@ -561,14 +589,12 @@ async function closeYoutube() {
   } catch (e) {}
 
   wv.remove();
-  youtubeView.classList.add('hidden');
-  youtubeView.classList.remove('yt-fullscreen');
-  updateYoutubeButton();
+  setYoutubeMode('closed');
   showToast('ปิด YouTube แล้ว (คืน RAM) — กดปุ่ม YouTube เพื่อดูต่อจากเดิม');
 }
 
 function toggleYoutube() {
-  if (isYoutubeVisible()) hideYoutube();
+  if (ytMode === 'full') leaveYoutube();
   else openYoutube();
 }
 
@@ -579,12 +605,74 @@ function youtubeNav(action) {
   else if (action === 'home') ytWebview.loadURL(PLATFORM_CONFIG.youtube.url);
 }
 
+// --- Mini player: drag anywhere, click to go back to full view ---
+function clampMiniPos(left, top) {
+  const maxLeft = window.innerWidth - youtubeView.offsetWidth - YT_MINI_MARGIN;
+  const maxTop = window.innerHeight - youtubeView.offsetHeight - YT_MINI_MARGIN;
+  return {
+    left: Math.max(YT_MINI_MARGIN, Math.min(left, maxLeft)),
+    top: Math.max(YT_MINI_MARGIN, Math.min(top, maxTop))
+  };
+}
+
+function placeMiniPlayer() {
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem(YT_MINI_POS_KEY)); } catch (e) {}
+  // Default: bottom-right corner (Infinity gets clamped to the edge)
+  const { left, top } = clampMiniPos(pos?.left ?? Infinity, pos?.top ?? Infinity);
+  youtubeView.style.left = `${left}px`;
+  youtubeView.style.top = `${top}px`;
+}
+
+window.addEventListener('resize', () => { if (ytMode === 'mini') placeMiniPlayer(); });
+
+ytMiniOverlay.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || e.target.closest('button')) return;
+  e.preventDefault();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startLeft = youtubeView.offsetLeft;
+  const startTop = youtubeView.offsetTop;
+  let dragged = false;
+  // Chat webviews would swallow mousemove while dragging over them
+  document.body.classList.add('mc-dragging');
+
+  const onMove = (ev) => {
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    if (!dragged && Math.hypot(dx, dy) < 5) return;
+    dragged = true;
+    const { left, top } = clampMiniPos(startLeft + dx, startTop + dy);
+    youtubeView.style.left = `${left}px`;
+    youtubeView.style.top = `${top}px`;
+  };
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.classList.remove('mc-dragging');
+    if (dragged) {
+      try {
+        localStorage.setItem(YT_MINI_POS_KEY, JSON.stringify({ left: youtubeView.offsetLeft, top: youtubeView.offsetTop }));
+      } catch (err) {}
+    } else {
+      openYoutube();
+    }
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
+
+document.getElementById('btn-yt-mini-play').addEventListener('click', () => {
+  sendToYoutube('mc-toggle-play');
+});
+document.getElementById('btn-yt-mini-close').addEventListener('click', closeYoutube);
+
 // New chat while watching → card on top of the video (drawn inside the YouTube page so it shows in fullscreen too)
 function notifyYoutubeOverlay(accId, count) {
   if (!isYoutubeVisible()) return;
   const acc = getAccounts().find(a => a.id === accId);
   if (!acc) return;
-  ytWebview.send('mc-notify', {
+  sendToYoutube('mc-notify', {
     accId,
     name: acc.name,
     platform: PLATFORM_CONFIG[acc.platform]?.name || 'แชท',

@@ -91,6 +91,14 @@
           <button id="btn-yt-close" class="pane-btn danger" title="ปิด YouTube (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i> ปิด</button>
         </div>
         <div id="youtube-webview-host" class="youtube-webview-host"></div>
+        <!-- Mini player overlay: webviews swallow mouse events, so drag/click is caught here -->
+        <div id="yt-mini-overlay" class="yt-mini-overlay" title="คลิกเพื่อกลับไปดูเต็มจอ / ลากเพื่อย้ายตำแหน่ง">
+          <div class="yt-mini-controls">
+            <button id="btn-yt-mini-play" class="yt-mini-btn" title="เล่น / หยุด"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i></button>
+            <button id="btn-yt-mini-close" class="yt-mini-btn" title="ปิด YouTube (คืน RAM)"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <span class="yt-mini-hint"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> คลิกเพื่อดูต่อ</span>
+        </div>
       </div>
 
       <!-- Quick Reply Seller Sidebar -->
