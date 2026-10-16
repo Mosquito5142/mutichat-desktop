@@ -110,7 +110,8 @@ function createWindow() {
 }
 
 // Global user agent for messenger compatibility (strips Electron signature)
-const CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+// Matches the bundled Chromium version so sites see a current, consistent Chrome
+const CHROME_USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome.split('.')[0]}.0.0.0 Safari/537.36`;
 
 app.on('web-contents-created', (event, contents) => {
   // Ctrl+Shift+Y toggles YouTube even when a chat/YouTube webview has keyboard focus

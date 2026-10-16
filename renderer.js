@@ -2,6 +2,9 @@ const { clipboard, ipcRenderer } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
+// Same User-Agent as main.js: a plain Chrome of the bundled Chromium version
+const CHROME_USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome.split('.')[0]}.0.0.0 Safari/537.36`;
+
 // YouTube ad-free + low-resource preload (only attached to YouTube panes)
 const YT_PRELOAD_URL = pathToFileURL(path.join(__dirname, 'yt-preload.js')).href;
 const YT_PARTITION = 'persist:youtube';
@@ -200,7 +203,7 @@ function initAccounts() {
             id="webview-${acc.id}" 
             src="${acc.url || 'https://www.messenger.com/'}" 
             partition="${acc.partition}"
-            useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            useragent="${CHROME_USER_AGENT}"
             allowpopups>
           </webview>
         </div>
@@ -571,7 +574,7 @@ function openYoutube() {
     ytWebview = document.createElement('webview');
     ytWebview.setAttribute('partition', YT_PARTITION);
     ytWebview.setAttribute('preload', YT_PRELOAD_URL);
-    ytWebview.setAttribute('useragent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
+    ytWebview.setAttribute('useragent', CHROME_USER_AGENT);
     ytWebview.setAttribute('src', startUrl);
 
     ytWebview.addEventListener('ipc-message', (e) => {

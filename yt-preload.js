@@ -64,6 +64,30 @@ const MAIN_WORLD_CODE = `(() => {
     }
   } catch (e) {}
 
+  // 5. Controls in the Picture-in-Picture window: Chromium only shows the -10s / +10s
+  //    (and prev / next) buttons when the page registers Media Session handlers
+  const mainVideo = () => document.querySelector('#movie_player video');
+  const SEEK_ACTIONS = {
+    seekbackward: (d) => { const v = mainVideo(); if (v) v.currentTime = Math.max(0, v.currentTime - ((d && d.seekOffset) || 10)); },
+    seekforward: (d) => { const v = mainVideo(); if (v) v.currentTime = Math.min(v.duration || Infinity, v.currentTime + ((d && d.seekOffset) || 10)); },
+    seekto: (d) => { const v = mainVideo(); if (v && d && isFinite(d.seekTime)) v.currentTime = d.seekTime; }
+  };
+  if (navigator.mediaSession && navigator.mediaSession.setActionHandler) {
+    const ms = navigator.mediaSession;
+    const origSetHandler = ms.setActionHandler.bind(ms);
+    for (const [action, fn] of Object.entries(SEEK_ACTIONS)) {
+      try { origSetHandler(action, fn); } catch (e) {}
+    }
+    // Prev / next clip: our default, YouTube may replace them with its own (playlist-aware) ones
+    try { origSetHandler('previoustrack', () => { const b = document.querySelector('.ytp-prev-button'); if (b) b.click(); }); } catch (e) {}
+    try { origSetHandler('nexttrack', () => { const b = document.querySelector('.ytp-next-button'); if (b) b.click(); }); } catch (e) {}
+    // Keep our seek handlers even if YouTube later clears or replaces them
+    ms.setActionHandler = (action, handler) => {
+      if (action in SEEK_ACTIONS) return;
+      return origSetHandler(action, handler);
+    };
+  }
+
   // 4. Fallback for ads that slip through + stop hover previews.
   //    Capture-phase media listeners: no MutationObserver, fires only while a video plays.
   let mutedByUs = false;
