@@ -190,6 +190,14 @@ app.on('window-all-closed', () => {
 });
 
 // IPC Handler to flash taskbar when new message arrives
+// Bring the app to the front (e.g. "back to tab" from the YouTube PiP window)
+ipcMain.on('focus-window', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
+
 ipcMain.on('flash-taskbar', (event) => {
   if (mainWindow && !mainWindow.isFocused()) {
     mainWindow.flashFrame(true);
