@@ -520,7 +520,7 @@ function isYoutubeVisible() {
 
 function setYoutubeMode(mode) {
   ytMode = mode;
-  youtubeView.classList.toggle('hidden', mode === 'closed' || mode === 'hidden');
+  youtubeView.classList.toggle('hidden', mode === 'closed' || mode === 'hidden' || mode === 'pip');
   youtubeView.classList.toggle('yt-mini', mode === 'mini');
   if (mode !== 'full') youtubeView.classList.remove('yt-fullscreen');
   if (mode === 'mini') placeMiniPlayer();
@@ -532,7 +532,35 @@ function setYoutubeMode(mode) {
   }
   sendToYoutube('mc-mini', mode === 'mini');
   btnYoutube.classList.toggle('active', mode === 'full');
-  btnYoutube.classList.toggle('yt-alive', mode === 'mini' || mode === 'hidden');
+  btnYoutube.classList.toggle('yt-alive', mode === 'mini' || mode === 'hidden' || mode === 'pip');
+}
+
+// ===== Picture-in-Picture: Chromium's own floating video window (stays on top of every app, like Chrome) =====
+const PIP_VIDEO = `document.querySelector('#movie_player video')`;
+
+async function enterPip() {
+  if (!ytWebview) return false;
+  try {
+    // userGesture=true: Chromium only opens PiP in response to a user action
+    return await ytWebview.executeJavaScript(
+      `(() => { const v = ${PIP_VIDEO}; if (!v || !document.pictureInPictureEnabled) return false;
+        return v.requestPictureInPicture().then(() => true, () => false); })()`, true);
+  } catch (e) {
+    return false;
+  }
+}
+
+function exitPip() {
+  if (!ytWebview) return Promise.resolve();
+  return ytWebview.executeJavaScript(
+    `document.pictureInPictureElement ? document.exitPictureInPicture().catch(() => {}) : null`).catch(() => {});
+}
+
+// Pop the clip out of the app on demand (button on the YouTube bar / mini player)
+async function popOutYoutube() {
+  if (!ytWebview) return;
+  if (await enterPip()) setYoutubeMode('pip');
+  else showToast('เครื่องนี้เปิดหน้าต่างลอยไม่ได้ ใช้จอเล็กในโปรแกรมแทน');
 }
 
 function openYoutube() {
@@ -551,6 +579,12 @@ function openYoutube() {
         const accId = e.args[0];
         if (getAccounts().some(a => a.id === accId)) focusAccountTab(accId);
         else leaveYoutube();
+      } else if (e.channel === 'mc-pip-return' && ytMode === 'pip') {
+        // "Back to tab" in the PiP window: bring the app up and keep watching here
+        ipcRenderer.send('focus-window');
+        openYoutube();
+      } else if (e.channel === 'mc-pip-closed' && ytMode === 'pip') {
+        setYoutubeMode('hidden');
       }
     });
     // Fill the whole window (over the top bar) while the video is fullscreen
@@ -561,6 +595,7 @@ function openYoutube() {
 
     youtubeHost.appendChild(ytWebview);
   }
+  if (ytMode === 'pip') exitPip();
   setYoutubeMode('full');
 }
 
@@ -573,11 +608,18 @@ function isWatchingVideo() {
   }
 }
 
-// Going to the chats: keep a clip playing in the mini player, otherwise just pause and hide
-function leaveYoutube() {
-  if (ytMode !== 'full') return;
+// Going to the chats: keep a clip playing in a floating window (in-app mini player if PiP fails),
+// otherwise just pause and hide
+let ytLeaving = false;
+
+async function leaveYoutube() {
+  if (ytMode !== 'full' || ytLeaving) return;
   if (isWatchingVideo()) {
-    setYoutubeMode('mini');
+    ytLeaving = true;
+    const inPip = await enterPip();
+    ytLeaving = false;
+    if (ytMode !== 'full') return; // user already moved on (e.g. closed YouTube)
+    setYoutubeMode(inPip ? 'pip' : 'mini');
   } else {
     sendToYoutube('mc-pause');
     setYoutubeMode('hidden');
@@ -587,6 +629,7 @@ function leaveYoutube() {
 async function closeYoutube() {
   if (!ytWebview) return;
   const wv = ytWebview;
+  if (ytMode === 'pip') await exitPip();
   ytWebview = null;
 
   // Remember the clip and position so reopening resumes where we left off
@@ -758,6 +801,8 @@ document.getElementById('btn-yt-back').addEventListener('click', () => youtubeNa
 document.getElementById('btn-yt-forward').addEventListener('click', () => youtubeNav('forward'));
 document.getElementById('btn-yt-home').addEventListener('click', () => youtubeNav('home'));
 document.getElementById('btn-yt-close').addEventListener('click', closeYoutube);
+document.getElementById('btn-yt-popout').addEventListener('click', popOutYoutube);
+document.getElementById('btn-yt-mini-popout').addEventListener('click', popOutYoutube);
 // Ctrl+Shift+Y works even while a webview has focus (forwarded from main process)
 ipcRenderer.on('toggle-youtube', toggleYoutube);
 

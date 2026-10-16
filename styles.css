@@ -888,6 +888,10 @@ webview {
 }
 
 .youtube-view-header .yt-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
   color: #e5e7eb;

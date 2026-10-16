@@ -74,13 +74,17 @@
             <button id="btn-yt-home" class="pane-btn" title="หน้าแรก YouTube"><i class="fa-solid fa-house"></i></button>
           </div>
           <span class="yt-title"><i class="fa-brands fa-youtube"></i> YouTube ไม่มีโฆษณา</span>
-          <button id="btn-yt-close" class="pane-btn danger" title="ปิด YouTube (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i> ปิด</button>
+          <div class="yt-nav">
+            <button id="btn-yt-popout" class="pane-btn" title="ลอยนอกโปรแกรม (อยู่เหนือทุกแอป เหมือน Chrome)"><i class="fa-solid fa-up-right-from-square"></i></button>
+            <button id="btn-yt-close" class="pane-btn danger" title="ปิด YouTube (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i></button>
+          </div>
         </div>
         <div id="youtube-webview-host" class="youtube-webview-host"></div>
         <!-- Mini player overlay: webviews swallow mouse events, so drag/click is caught here -->
         <div id="yt-mini-overlay" class="yt-mini-overlay" title="คลิกเพื่อกลับไปดูเต็มจอ / ลากเพื่อย้ายตำแหน่ง / ลากมุมเพื่อย่อขยาย">
           <div class="yt-mini-controls">
             <button id="btn-yt-mini-play" class="yt-mini-btn" title="เล่น / หยุด"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i></button>
+            <button id="btn-yt-mini-popout" class="yt-mini-btn" title="ลอยนอกโปรแกรม (อยู่เหนือทุกแอป)"><i class="fa-solid fa-up-right-from-square"></i></button>
             <button id="btn-yt-mini-close" class="yt-mini-btn" title="ปิด YouTube (คืน RAM)"><i class="fa-solid fa-xmark"></i></button>
           </div>
           <span class="yt-mini-hint"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> คลิกเพื่อดูต่อ</span>

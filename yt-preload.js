@@ -247,6 +247,11 @@ ipcRenderer.on('mc-toggle-play', () => {
   else video.pause();
 });
 
+// Leaving the PiP window: Chromium keeps playing for "back to tab" and pauses when it is closed
+document.addEventListener('leavepictureinpicture', (e) => {
+  ipcRenderer.sendToHost(e.target.paused ? 'mc-pip-closed' : 'mc-pip-return');
+}, true);
+
 ipcRenderer.on('mc-pause', () => {
   const video = document.querySelector('#movie_player video');
   if (video && !video.paused) video.pause();
