@@ -50,7 +50,7 @@
   "author": "Antigravity",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^31.2.0",
+    "electron": "^44.8.0",
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
