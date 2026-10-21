@@ -834,11 +834,11 @@ webview {
   color: #ef4444;
 }
 
-.youtube-btn.yt-alive {
+.media-btn.yt-alive {
   position: relative;
 }
 
-.youtube-btn.yt-alive::before {
+.media-btn.yt-alive::before {
   content: '';
   position: absolute;
   top: 4px;
@@ -860,6 +860,12 @@ webview {
 
 .youtube-view.hidden {
   display: none;
+}
+
+/* Still laid out but under the chats (TikTok while it floats in PiP) */
+.youtube-view.yt-behind {
+  z-index: -1;
+  pointer-events: none;
 }
 
 .youtube-view.yt-fullscreen {
@@ -905,6 +911,10 @@ webview {
   flex: 1;
   display: flex;
   min-height: 0;
+}
+
+.youtube-webview-host webview.mc-media-hidden {
+  display: none;
 }
 
 .youtube-webview-host webview {

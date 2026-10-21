@@ -114,12 +114,14 @@ function createWindow() {
 const CHROME_USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome.split('.')[0]}.0.0.0 Safari/537.36`;
 
 app.on('web-contents-created', (event, contents) => {
-  // Ctrl+Shift+Y toggles YouTube even when a chat/YouTube webview has keyboard focus
+  // Ctrl+Shift+Y / Ctrl+Shift+K toggle YouTube / TikTok even when a webview has keyboard focus
   contents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown' || !input.control) return;
-    if (input.shift && input.key.toLowerCase() === 'y') {
+    // Ctrl+Shift+Y = YouTube, Ctrl+Shift+K = TikTok
+    const mediaToggle = input.shift && { y: 'toggle-youtube', k: 'toggle-tiktok' }[input.key.toLowerCase()];
+    if (mediaToggle) {
       e.preventDefault();
-      if (mainWindow) mainWindow.webContents.send('toggle-youtube');
+      if (mainWindow) mainWindow.webContents.send(mediaToggle);
       return;
     }
     // Ctrl + / Ctrl - / Ctrl 0 zoom the pane that has focus (handled per account in the renderer)

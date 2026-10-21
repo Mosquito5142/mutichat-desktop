@@ -39,9 +39,13 @@
 
       <!-- Quick Action Controls -->
       <div class="top-actions">
-        <button id="btn-youtube" class="action-btn youtube-btn" title="เปิด/ซ่อน YouTube ไม่มีโฆษณา (Ctrl+Shift+Y)">
+        <button id="btn-youtube" class="action-btn media-btn youtube-btn" title="เปิด/ซ่อน YouTube ไม่มีโฆษณา (Ctrl+Shift+Y)">
           <i class="fa-brands fa-youtube"></i>
           <span>YouTube</span>
+        </button>
+        <button id="btn-tiktok" class="action-btn media-btn tiktok-btn" title="เปิด/ซ่อน TikTok (Ctrl+Shift+K)">
+          <i class="fa-brands fa-tiktok"></i>
+          <span>TikTok</span>
         </button>
         <button id="btn-mode-grid" class="action-btn active" title="แสดงทุกบัญชีแบบแบ่งหน้าจอ (Grid View)">
           <i class="fa-solid fa-table-cells-large"></i>
@@ -71,12 +75,12 @@
           <div class="yt-nav">
             <button id="btn-yt-back" class="pane-btn" title="ย้อนกลับ"><i class="fa-solid fa-arrow-left"></i></button>
             <button id="btn-yt-forward" class="pane-btn" title="ไปข้างหน้า"><i class="fa-solid fa-arrow-right"></i></button>
-            <button id="btn-yt-home" class="pane-btn" title="หน้าแรก YouTube"><i class="fa-solid fa-house"></i></button>
+            <button id="btn-yt-home" class="pane-btn" title="หน้าแรก"><i class="fa-solid fa-house"></i></button>
           </div>
-          <span class="yt-title"><i class="fa-brands fa-youtube"></i> YouTube ไม่มีโฆษณา</span>
+          <span id="media-title" class="yt-title"><i class="fa-brands fa-youtube" style="color:#ef4444;"></i> YouTube ไม่มีโฆษณา</span>
           <div class="yt-nav">
             <button id="btn-yt-popout" class="pane-btn" title="ลอยนอกโปรแกรม (อยู่เหนือทุกแอป เหมือน Chrome)"><i class="fa-solid fa-up-right-from-square"></i></button>
-            <button id="btn-yt-close" class="pane-btn danger" title="ปิด YouTube (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i></button>
+            <button id="btn-yt-close" class="pane-btn danger" title="ปิด (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i></button>
           </div>
         </div>
         <div id="youtube-webview-host" class="youtube-webview-host"></div>
@@ -85,7 +89,7 @@
           <div class="yt-mini-controls">
             <button id="btn-yt-mini-play" class="yt-mini-btn" title="เล่น / หยุด"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i></button>
             <button id="btn-yt-mini-popout" class="yt-mini-btn" title="ลอยนอกโปรแกรม (อยู่เหนือทุกแอป)"><i class="fa-solid fa-up-right-from-square"></i></button>
-            <button id="btn-yt-mini-close" class="yt-mini-btn" title="ปิด YouTube (คืน RAM)"><i class="fa-solid fa-xmark"></i></button>
+            <button id="btn-yt-mini-close" class="yt-mini-btn" title="ปิด (คืน RAM)"><i class="fa-solid fa-xmark"></i></button>
           </div>
           <span class="yt-mini-hint"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> คลิกเพื่อดูต่อ</span>
           <div class="yt-mini-resize" data-corner="tl" title="ลากเพื่อย่อ/ขยาย"></div>
