@@ -1,45 +1,88 @@
-// YouTube webview preload — ad-free + low-resource mode (no dependencies)
-// Runs before YouTube's own scripts. Code is pushed into the page's main world via
-// webFrame.executeJavaScript (bypasses YouTube's CSP / Trusted Types).
+// Preload for the floating media view (YouTube ad-free + TikTok), no dependencies.
+// Runs before the site's own scripts. Code is pushed into the page's main world via
+// webFrame.executeJavaScript (bypasses the sites' CSP / Trusted Types).
 const { webFrame, ipcRenderer } = require('electron');
 
+const IS_YOUTUBE = /(^|\.)youtube\.com$/.test(location.hostname);
+const IS_TIKTOK = /(^|\.)tiktok\.com$/.test(location.hostname);
+
+// The clip the user is watching: YouTube's player video, elsewhere the playing video,
+// or else the video taking the most room on screen (e.g. the TikTok clip in view).
+// Also injected into the page (window.__mcMainVideo) for PiP / play state checks from the host.
+function mainVideo() {
+  if (/(^|\.)youtube\.com$/.test(location.hostname)) return document.querySelector('#movie_player video');
+  const videos = Array.from(document.querySelectorAll('video'));
+  const playing = videos.find(v => !v.paused && !v.ended);
+  if (playing) return playing;
+  let best = null;
+  let bestArea = 0;
+  for (const v of videos) {
+    const r = v.getBoundingClientRect();
+    const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0);
+    const h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+    const area = w > 0 && h > 0 ? w * h : 0;
+    if (area > bestArea) { best = v; bestArea = area; }
+  }
+  return best;
+}
+
 const MAIN_WORLD_CODE = `(() => {
-  if (window.__mcYtAdblock) return;
-  window.__mcYtAdblock = true;
+  if (window.__mcMediaPreload) return;
+  window.__mcMediaPreload = true;
+  const IS_YOUTUBE = ${IS_YOUTUBE};
+  const IS_TIKTOK = ${IS_TIKTOK};
+  window.__mcMainVideo = ${mainVideo.toString()};
+  const mainVideo = window.__mcMainVideo;
 
-  // 1. json-prune: strip ad payloads before the player sees them (same idea as uBlock/Brave scriptlets)
-  const AD_KEYS = ['adPlacements', 'adSlots', 'playerAds', 'adBreakHeartbeatParams'];
-  const prune = (obj) => {
-    if (obj && typeof obj === 'object') {
-      for (const k of AD_KEYS) if (k in obj) delete obj[k];
-      if (obj.playerResponse) prune(obj.playerResponse);
-    }
-    return obj;
-  };
+  // TikTok pauses its clips when the page looks hidden; keep it "visible" so a clip
+  // keeps playing in the floating PiP window while the app shows the chats
+  if (IS_TIKTOK) {
+    try {
+      Object.defineProperty(Document.prototype, 'hidden', { configurable: true, get: () => false });
+      Object.defineProperty(Document.prototype, 'visibilityState', { configurable: true, get: () => 'visible' });
+    } catch (e) {}
+    const swallow = (e) => e.stopImmediatePropagation();
+    window.addEventListener('visibilitychange', swallow, true);
+    document.addEventListener('visibilitychange', swallow, true);
+  }
 
-  const origParse = JSON.parse;
-  JSON.parse = function () {
-    const res = origParse.apply(this, arguments);
-    try { prune(res); } catch (e) {}
-    return res;
-  };
+  if (IS_YOUTUBE) {
+    window.__mcYtAdblock = true;
 
-  const origJson = Response.prototype.json;
-  Response.prototype.json = function () {
-    return origJson.apply(this, arguments).then((res) => {
+    // 1. json-prune: strip ad payloads before the player sees them (same idea as uBlock/Brave scriptlets)
+    const AD_KEYS = ['adPlacements', 'adSlots', 'playerAds', 'adBreakHeartbeatParams'];
+    const prune = (obj) => {
+      if (obj && typeof obj === 'object') {
+        for (const k of AD_KEYS) if (k in obj) delete obj[k];
+        if (obj.playerResponse) prune(obj.playerResponse);
+      }
+      return obj;
+    };
+
+    const origParse = JSON.parse;
+    JSON.parse = function () {
+      const res = origParse.apply(this, arguments);
       try { prune(res); } catch (e) {}
       return res;
-    });
-  };
+    };
 
-  let initialPlayerResponse;
-  try {
-    Object.defineProperty(window, 'ytInitialPlayerResponse', {
-      configurable: true,
-      get() { return initialPlayerResponse; },
-      set(v) { initialPlayerResponse = prune(v); }
-    });
-  } catch (e) {}
+    const origJson = Response.prototype.json;
+    Response.prototype.json = function () {
+      return origJson.apply(this, arguments).then((res) => {
+        try { prune(res); } catch (e) {}
+        return res;
+      });
+    };
+
+    let initialPlayerResponse;
+    try {
+      Object.defineProperty(window, 'ytInitialPlayerResponse', {
+        configurable: true,
+        get() { return initialPlayerResponse; },
+        set(v) { initialPlayerResponse = prune(v); }
+      });
+    } catch (e) {}
+  }
 
   // 2. Low-resource: force H.264 (hardware decoded on most PCs) instead of VP9/AV1
   const HEAVY_CODECS = /vp0?9|av01/i;
@@ -52,9 +95,9 @@ const MAIN_WORLD_CODE = `(() => {
     return HEAVY_CODECS.test(type) ? '' : origCanPlay.call(this, type);
   };
 
-  // 3. Low-resource: default quality 720p (only if the user never picked one)
+  // 3. Low-resource: default YouTube quality 720p (only if the user never picked one)
   try {
-    if (!localStorage.getItem('yt-player-quality')) {
+    if (IS_YOUTUBE && !localStorage.getItem('yt-player-quality')) {
       const now = Date.now();
       localStorage.setItem('yt-player-quality', JSON.stringify({
         data: JSON.stringify({ quality: 720, previousQuality: 720 }),
@@ -66,7 +109,6 @@ const MAIN_WORLD_CODE = `(() => {
 
   // 5. Controls in the Picture-in-Picture window: Chromium only shows the -10s / +10s
   //    (and prev / next) buttons when the page registers Media Session handlers
-  const mainVideo = () => document.querySelector('#movie_player video');
   const SEEK_ACTIONS = {
     seekbackward: (d) => { const v = mainVideo(); if (v) v.currentTime = Math.max(0, v.currentTime - ((d && d.seekOffset) || 10)); },
     seekforward: (d) => { const v = mainVideo(); if (v) v.currentTime = Math.min(v.duration || Infinity, v.currentTime + ((d && d.seekOffset) || 10)); },
@@ -79,8 +121,10 @@ const MAIN_WORLD_CODE = `(() => {
       try { origSetHandler(action, fn); } catch (e) {}
     }
     // Prev / next clip: our default, YouTube may replace them with its own (playlist-aware) ones
-    try { origSetHandler('previoustrack', () => { const b = document.querySelector('.ytp-prev-button'); if (b) b.click(); }); } catch (e) {}
-    try { origSetHandler('nexttrack', () => { const b = document.querySelector('.ytp-next-button'); if (b) b.click(); }); } catch (e) {}
+    if (IS_YOUTUBE) {
+      try { origSetHandler('previoustrack', () => { const b = document.querySelector('.ytp-prev-button'); if (b) b.click(); }); } catch (e) {}
+      try { origSetHandler('nexttrack', () => { const b = document.querySelector('.ytp-next-button'); if (b) b.click(); }); } catch (e) {}
+    }
     // Keep our seek handlers even if YouTube later clears or replaces them
     ms.setActionHandler = (action, handler) => {
       if (action in SEEK_ACTIONS) return;
@@ -88,35 +132,38 @@ const MAIN_WORLD_CODE = `(() => {
     };
   }
 
-  // 4. Fallback for ads that slip through + stop hover previews.
+  // 4. YouTube: fallback for ads that slip through + stop hover previews.
   //    Capture-phase media listeners: no MutationObserver, fires only while a video plays.
-  let mutedByUs = false;
-  document.addEventListener('timeupdate', (e) => {
-    const video = e.target;
-    const player = video.closest && video.closest('#movie_player');
-    if (!player) return;
-    if (player.classList.contains('ad-showing')) {
-      if (!video.muted) { video.muted = true; mutedByUs = true; }
-      if (isFinite(video.duration) && video.currentTime < video.duration - 0.1) {
-        video.currentTime = video.duration;
+  if (IS_YOUTUBE) {
+    let mutedByUs = false;
+    document.addEventListener('timeupdate', (e) => {
+      const video = e.target;
+      const player = video.closest && video.closest('#movie_player');
+      if (!player) return;
+      if (player.classList.contains('ad-showing')) {
+        if (!video.muted) { video.muted = true; mutedByUs = true; }
+        if (isFinite(video.duration) && video.currentTime < video.duration - 0.1) {
+          video.currentTime = video.duration;
+        }
+        const skipBtn = document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern');
+        if (skipBtn) skipBtn.click();
+      } else if (mutedByUs) {
+        video.muted = false;
+        mutedByUs = false;
       }
-      const skipBtn = document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern');
-      if (skipBtn) skipBtn.click();
-    } else if (mutedByUs) {
-      video.muted = false;
-      mutedByUs = false;
-    }
-  }, true);
+    }, true);
 
-  document.addEventListener('play', (e) => {
-    const video = e.target;
-    if (video.closest && video.closest('ytd-video-preview, #inline-preview-player, #video-preview')) {
-      video.pause();
-    }
-  }, true);
+    document.addEventListener('play', (e) => {
+      const video = e.target;
+      if (video.closest && video.closest('ytd-video-preview, #inline-preview-player, #video-preview')) {
+        video.pause();
+      }
+    }, true);
+  }
 })();`;
 
-const HIDE_CSS = `
+// YouTube only: hide ads / banners / the ad-blocker nag, and the video-only mini player layout
+const YOUTUBE_CSS = `
   ytd-ad-slot-renderer,
   ytd-in-feed-ad-layout-renderer,
   ytd-banner-promo-renderer,
@@ -154,7 +201,10 @@ const HIDE_CSS = `
   html.mc-mini .ytp-gradient-top {
     display: none !important;
   }
+`;
 
+// Every site: new-chat cards
+const COMMON_CSS = `
   /* Multi-Chat: new-chat cards on top of the video (also in fullscreen) */
   #mc-notify-stack {
     position: fixed;
@@ -201,7 +251,8 @@ const HIDE_CSS = `
 webFrame.executeJavaScript(MAIN_WORLD_CODE);
 
 window.addEventListener('DOMContentLoaded', () => {
-  webFrame.insertCSS(HIDE_CSS);
+  webFrame.insertCSS(COMMON_CSS);
+  if (IS_YOUTUBE) webFrame.insertCSS(YOUTUBE_CSS);
 });
 
 // ===== Messages from the Multi-Chat host =====
@@ -265,7 +316,7 @@ ipcRenderer.on('mc-mini', (_event, on) => {
 });
 
 ipcRenderer.on('mc-toggle-play', () => {
-  const video = document.querySelector('#movie_player video');
+  const video = mainVideo();
   if (!video) return;
   if (video.paused) video.play().catch(() => {});
   else video.pause();
@@ -277,6 +328,6 @@ document.addEventListener('leavepictureinpicture', (e) => {
 }, true);
 
 ipcRenderer.on('mc-pause', () => {
-  const video = document.querySelector('#movie_player video');
+  const video = mainVideo();
   if (video && !video.paused) video.pause();
 });

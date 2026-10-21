@@ -5,8 +5,8 @@ const { pathToFileURL } = require('url');
 // Same User-Agent as main.js: a plain Chrome of the bundled Chromium version
 const CHROME_USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome.split('.')[0]}.0.0.0 Safari/537.36`;
 
-// YouTube ad-free + low-resource preload (only attached to YouTube panes)
-const YT_PRELOAD_URL = pathToFileURL(path.join(__dirname, 'yt-preload.js')).href;
+// Preload for the floating media view (YouTube ad-free + TikTok, low-resource, new-chat cards)
+const MEDIA_PRELOAD_URL = pathToFileURL(path.join(__dirname, 'media-preload.js')).href;
 const YT_PARTITION = 'persist:youtube';
 const YT_LAST_URL_KEY = 'yt_last_url';
 
@@ -495,13 +495,15 @@ function setupWebviewEvents(wv, statusEl, accId) {
   });
 }
 
-// ===== YouTube Floating View (ad-free) =====
-// Lives on top of the chat area instead of taking a grid column.
-// Modes: closed (no webview) | full (over the chat area) | mini (small draggable player, keeps playing)
-//        | hidden (paused, used when leaving a non-video page). Close = destroy webview (frees all its RAM).
+// ===== Media Floating View (YouTube ad-free, TikTok) =====
+// Lives on top of the chat area instead of taking a grid column. One site is shown at a time;
+// switching pauses and hides the other (kept loaded until closed).
+// Modes of the shown site: closed (no webview) | full (over the chat area) | pip (floating window above all apps)
+//        | mini (in-app player, PiP fallback) | hidden (paused). Close = destroy that site's webview (frees its RAM).
 const youtubeView = document.getElementById('youtube-view');
 const youtubeHost = document.getElementById('youtube-webview-host');
 const ytMiniOverlay = document.getElementById('yt-mini-overlay');
+const mediaTitle = document.getElementById('media-title');
 const btnYoutube = document.getElementById('btn-youtube');
 const YT_MINI_POS_KEY = 'yt_mini_pos';
 const YT_MINI_SIZE_KEY = 'yt_mini_width';
@@ -509,8 +511,33 @@ const YT_MINI_MARGIN = 16;
 const YT_MINI_MIN_WIDTH = 240;
 const YT_MINI_DEFAULT_WIDTH = 384;
 const lastUnreadMap = {};
-let ytWebview = null;
-let ytMode = 'closed';
+
+const MEDIA_SITES = {
+  youtube: {
+    name: 'YouTube',
+    title: '<i class="fa-brands fa-youtube" style="color:#ef4444;"></i> YouTube ไม่มีโฆษณา',
+    url: PLATFORM_CONFIG.youtube.url,
+    partition: YT_PARTITION,
+    lastUrlKey: YT_LAST_URL_KEY,
+    button: btnYoutube
+  },
+  tiktok: {
+    name: 'TikTok',
+    title: '<i class="fa-brands fa-tiktok" style="color:#f1f5f9;"></i> TikTok',
+    url: 'https://www.tiktok.com/foryou',
+    partition: 'persist:tiktok',
+    lastUrlKey: 'tt_last_url',
+    button: document.getElementById('btn-tiktok'),
+    // TikTok pauses clips that scroll out of view, so while it floats in PiP keep the page
+    // laid out (just tucked behind the chats) instead of display:none
+    keepRenderedInPip: true
+  }
+};
+
+const mediaWebviews = {};    // site -> webview (only sites that are open)
+let activeSite = 'youtube';  // site shown in the floating view
+let ytWebview = null;        // webview of activeSite
+let ytMode = 'closed';       // mode of activeSite
 
 // webview.send throws until the guest page has fired dom-ready
 function sendToYoutube(channel, ...args) {
@@ -521,9 +548,19 @@ function isYoutubeVisible() {
   return ytMode === 'full';
 }
 
+function updateMediaButtons() {
+  Object.entries(MEDIA_SITES).forEach(([site, cfg]) => {
+    const shown = site === activeSite && ytMode === 'full';
+    cfg.button.classList.toggle('active', shown);
+    cfg.button.classList.toggle('yt-alive', !!mediaWebviews[site] && !shown);
+  });
+}
+
 function setYoutubeMode(mode) {
   ytMode = mode;
-  youtubeView.classList.toggle('hidden', mode === 'closed' || mode === 'hidden' || mode === 'pip');
+  const behindChats = mode === 'pip' && !!MEDIA_SITES[activeSite].keepRenderedInPip;
+  youtubeView.classList.toggle('hidden', mode === 'closed' || mode === 'hidden' || (mode === 'pip' && !behindChats));
+  youtubeView.classList.toggle('yt-behind', behindChats);
   youtubeView.classList.toggle('yt-mini', mode === 'mini');
   if (mode !== 'full') youtubeView.classList.remove('yt-fullscreen');
   if (mode === 'mini') placeMiniPlayer();
@@ -534,12 +571,12 @@ function setYoutubeMode(mode) {
     youtubeView.style.height = '';
   }
   sendToYoutube('mc-mini', mode === 'mini');
-  btnYoutube.classList.toggle('active', mode === 'full');
-  btnYoutube.classList.toggle('yt-alive', mode === 'mini' || mode === 'hidden' || mode === 'pip');
+  updateMediaButtons();
 }
 
 // ===== Picture-in-Picture: Chromium's own floating video window (stays on top of every app, like Chrome) =====
-const PIP_VIDEO = `document.querySelector('#movie_player video')`;
+// __mcMainVideo() is defined by media-preload.js (YouTube player video, or the playing / largest video elsewhere)
+const PIP_VIDEO = `(window.__mcMainVideo ? window.__mcMainVideo() : document.querySelector('video'))`;
 
 async function enterPip() {
   if (!ytWebview) return false;
@@ -553,75 +590,97 @@ async function enterPip() {
   }
 }
 
-function exitPip() {
-  if (!ytWebview) return Promise.resolve();
-  return ytWebview.executeJavaScript(
+function exitPip(wv = ytWebview) {
+  if (!wv) return Promise.resolve();
+  return wv.executeJavaScript(
     `document.pictureInPictureElement ? document.exitPictureInPicture().catch(() => {}) : null`).catch(() => {});
 }
 
-// Pop the clip out of the app on demand (button on the YouTube bar / mini player)
+// Pop the clip out of the app on demand (button on the media bar / mini player)
 async function popOutYoutube() {
   if (!ytWebview) return;
   if (await enterPip()) setYoutubeMode('pip');
   else showToast('เครื่องนี้เปิดหน้าต่างลอยไม่ได้ ใช้จอเล็กในโปรแกรมแทน');
 }
 
-function openYoutube() {
-  if (!ytWebview) {
-    let startUrl = PLATFORM_CONFIG.youtube.url;
-    try { startUrl = localStorage.getItem(YT_LAST_URL_KEY) || startUrl; } catch (e) {}
+function createMediaWebview(site) {
+  const cfg = MEDIA_SITES[site];
+  let startUrl = cfg.url;
+  try { startUrl = localStorage.getItem(cfg.lastUrlKey) || startUrl; } catch (e) {}
 
-    ytWebview = document.createElement('webview');
-    ytWebview.setAttribute('partition', YT_PARTITION);
-    ytWebview.setAttribute('preload', YT_PRELOAD_URL);
-    ytWebview.setAttribute('useragent', CHROME_USER_AGENT);
-    ytWebview.setAttribute('src', startUrl);
+  const wv = document.createElement('webview');
+  wv.setAttribute('partition', cfg.partition);
+  wv.setAttribute('preload', MEDIA_PRELOAD_URL);
+  wv.setAttribute('useragent', CHROME_USER_AGENT);
+  wv.setAttribute('src', startUrl);
 
-    ytWebview.addEventListener('ipc-message', (e) => {
-      if (e.channel === 'mc-open-chat') {
-        const accId = e.args[0];
-        if (getAccounts().some(a => a.id === accId)) focusAccountTab(accId);
-        else leaveYoutube();
-      } else if (e.channel === 'mc-pip-return' && ytMode === 'pip') {
-        // "Back to tab" in the PiP window: bring the app up and keep watching here
-        ipcRenderer.send('focus-window');
-        openYoutube();
-      } else if (e.channel === 'mc-pip-closed' && ytMode === 'pip') {
-        setYoutubeMode('hidden');
-      }
-    });
-    // Fill the whole window (over the top bar) while the video is fullscreen
-    ytWebview.addEventListener('enter-html-full-screen', () => youtubeView.classList.add('yt-fullscreen'));
-    ytWebview.addEventListener('leave-html-full-screen', () => youtubeView.classList.remove('yt-fullscreen'));
-    // Keep the "video only" layout across page loads while mini
-    ytWebview.addEventListener('dom-ready', () => sendToYoutube('mc-mini', ytMode === 'mini'));
+  wv.addEventListener('ipc-message', (e) => {
+    if (wv !== ytWebview) return; // a hidden site has nothing to say
+    if (e.channel === 'mc-open-chat') {
+      const accId = e.args[0];
+      if (getAccounts().some(a => a.id === accId)) focusAccountTab(accId);
+      else leaveYoutube();
+    } else if (e.channel === 'mc-pip-return' && ytMode === 'pip') {
+      // "Back to tab" in the PiP window: bring the app up and keep watching here
+      ipcRenderer.send('focus-window');
+      openMedia(site);
+    } else if (e.channel === 'mc-pip-closed' && ytMode === 'pip') {
+      setYoutubeMode('hidden');
+    }
+  });
+  // Fill the whole window (over the top bar) while the video is fullscreen
+  wv.addEventListener('enter-html-full-screen', () => youtubeView.classList.add('yt-fullscreen'));
+  wv.addEventListener('leave-html-full-screen', () => youtubeView.classList.remove('yt-fullscreen'));
+  // Keep the "video only" layout across page loads while mini
+  wv.addEventListener('dom-ready', () => { if (wv === ytWebview) sendToYoutube('mc-mini', ytMode === 'mini'); });
 
-    youtubeHost.appendChild(ytWebview);
+  youtubeHost.appendChild(wv);
+  mediaWebviews[site] = wv;
+  return wv;
+}
+
+function openMedia(site) {
+  // One site at a time: pause and hide the one that was showing / floating
+  if (site !== activeSite && ytWebview) {
+    const prev = ytWebview;
+    exitPip(prev);
+    sendToYoutube('mc-pause');
+    sendToYoutube('mc-mini', false);
+    prev.classList.add('mc-media-hidden');
   }
-  if (ytMode === 'pip') exitPip();
+  const switching = site !== activeSite;
+  activeSite = site;
+  ytWebview = mediaWebviews[site] || createMediaWebview(site);
+  ytWebview.classList.remove('mc-media-hidden');
+  mediaTitle.innerHTML = MEDIA_SITES[site].title;
+  if (!switching && ytMode === 'pip') exitPip();
   setYoutubeMode('full');
 }
 
-function isWatchingVideo() {
+function openYoutube() {
+  openMedia(activeSite);
+}
+
+async function isPlayingVideo() {
   try {
-    const { pathname } = new URL(ytWebview.getURL());
-    return pathname === '/watch' || pathname.startsWith('/shorts/') || pathname.startsWith('/live/');
+    return await ytWebview.executeJavaScript(`(() => { const v = ${PIP_VIDEO}; return !!(v && !v.paused && !v.ended); })()`);
   } catch (e) {
     return false;
   }
 }
 
-// Going to the chats: keep a clip playing in a floating window (in-app mini player if PiP fails),
+// Going to the chats: keep a playing clip in a floating window (in-app mini player if PiP fails),
 // otherwise just pause and hide
 let ytLeaving = false;
 
 async function leaveYoutube() {
   if (ytMode !== 'full' || ytLeaving) return;
-  if (isWatchingVideo()) {
-    ytLeaving = true;
-    const inPip = await enterPip();
-    ytLeaving = false;
-    if (ytMode !== 'full') return; // user already moved on (e.g. closed YouTube)
+  ytLeaving = true;
+  const playing = await isPlayingVideo();
+  const inPip = playing && await enterPip();
+  ytLeaving = false;
+  if (ytMode !== 'full') return; // user already moved on (e.g. closed it)
+  if (playing) {
     setYoutubeMode(inPip ? 'pip' : 'mini');
   } else {
     sendToYoutube('mc-pause');
@@ -632,36 +691,43 @@ async function leaveYoutube() {
 async function closeYoutube() {
   if (!ytWebview) return;
   const wv = ytWebview;
+  const site = activeSite;
+  const cfg = MEDIA_SITES[site];
   if (ytMode === 'pip') await exitPip();
   ytWebview = null;
+  delete mediaWebviews[site];
 
-  // Remember the clip and position so reopening resumes where we left off
+  // Remember the page (and YouTube position) so reopening resumes where we left off
   try {
     const url = new URL(wv.getURL());
-    if (url.hostname.endsWith('youtube.com')) {
-      if (url.pathname === '/watch') {
+    if (/^https?:$/.test(url.protocol)) {
+      if (url.hostname.endsWith('youtube.com') && url.pathname === '/watch') {
         const time = await wv.executeJavaScript(`(document.querySelector('#movie_player video') || {}).currentTime || 0`);
         if (time > 5) url.searchParams.set('t', `${Math.floor(time)}s`);
       }
-      localStorage.setItem(YT_LAST_URL_KEY, url.href);
+      localStorage.setItem(cfg.lastUrlKey, url.href);
     }
   } catch (e) {}
 
   wv.remove();
   setYoutubeMode('closed');
-  showToast('ปิด YouTube แล้ว (คืน RAM) — กดปุ่ม YouTube เพื่อดูต่อจากเดิม');
+  showToast(`ปิด ${cfg.name} แล้ว (คืน RAM) — กดปุ่ม ${cfg.name} เพื่อดูต่อจากเดิม`);
+}
+
+function toggleMedia(site) {
+  if (site === activeSite && ytMode === 'full') leaveYoutube();
+  else openMedia(site);
 }
 
 function toggleYoutube() {
-  if (ytMode === 'full') leaveYoutube();
-  else openYoutube();
+  toggleMedia('youtube');
 }
 
 function youtubeNav(action) {
   if (!ytWebview) return;
   if (action === 'back' && ytWebview.canGoBack()) ytWebview.goBack();
   else if (action === 'forward' && ytWebview.canGoForward()) ytWebview.goForward();
-  else if (action === 'home') ytWebview.loadURL(PLATFORM_CONFIG.youtube.url);
+  else if (action === 'home') ytWebview.loadURL(MEDIA_SITES[activeSite].url);
 }
 
 // --- Mini player: drag anywhere, click to go back to full view ---
@@ -800,6 +866,7 @@ function notifyYoutubeOverlay(accId, count) {
 }
 
 btnYoutube.addEventListener('click', toggleYoutube);
+MEDIA_SITES.tiktok.button.addEventListener('click', () => toggleMedia('tiktok'));
 document.getElementById('btn-yt-back').addEventListener('click', () => youtubeNav('back'));
 document.getElementById('btn-yt-forward').addEventListener('click', () => youtubeNav('forward'));
 document.getElementById('btn-yt-home').addEventListener('click', () => youtubeNav('home'));
@@ -808,6 +875,7 @@ document.getElementById('btn-yt-popout').addEventListener('click', popOutYoutube
 document.getElementById('btn-yt-mini-popout').addEventListener('click', popOutYoutube);
 // Ctrl+Shift+Y works even while a webview has focus (forwarded from main process)
 ipcRenderer.on('toggle-youtube', toggleYoutube);
+ipcRenderer.on('toggle-tiktok', () => toggleMedia('tiktok'));
 
 // ===== Per-pane zoom (Ctrl + / Ctrl - / Ctrl 0 / Ctrl + wheel), remembered per account =====
 const ZOOM_STEP = 0.5;
