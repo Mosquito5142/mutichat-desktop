@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, session, nativeTheme, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, nativeTheme, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -193,6 +193,11 @@ app.on('window-all-closed', () => {
 });
 
 // IPC Handler to flash taskbar when new message arrives
+// Quick Reply "copy" button
+ipcMain.on('clipboard-write', (event, text) => {
+  if (typeof text === 'string') Promise.resolve(clipboard.writeText(text)).catch(() => {});
+});
+
 // Bring the app to the front (e.g. "back to tab" from the YouTube PiP window)
 ipcMain.on('focus-window', () => {
   if (!mainWindow) return;

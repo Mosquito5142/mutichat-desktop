@@ -1,4 +1,4 @@
-const { clipboard, ipcRenderer } = require('electron');
+const { ipcRenderer } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
@@ -1004,9 +1004,9 @@ inputImportSnippets.addEventListener('change', async () => {
 // Copy Snippet Logic
 function copySnippet(btnElement) {
   const card = btnElement.closest('.snippet-card');
-  let textToCopy = card.getAttribute('data-text');
-  textToCopy = textToCopy.replace(/\\n/g, '\n');
-  clipboard.writeText(textToCopy);
+  const textToCopy = card.getAttribute('data-text');
+  // Electron no longer exposes `clipboard` to the page, so the main process writes it
+  ipcRenderer.send('clipboard-write', textToCopy);
   showToast('คัดลอกข้อความแล้ว! พร้อมกด Ctrl+V วางในแชท');
 }
 
@@ -1107,8 +1107,8 @@ function renderSnippets() {
   snippets.forEach(item => {
     const card = document.createElement('div');
     card.className = 'snippet-card';
-    const escapedText = item.content.replace(/"/g, '&quot;').replace(/\n/g, '\\n');
-    card.setAttribute('data-text', escapedText);
+    // setAttribute stores the text as-is (no HTML escaping needed), so it copies back exactly
+    card.setAttribute('data-text', item.content);
 
     card.innerHTML = `
       <div class="snippet-top">
