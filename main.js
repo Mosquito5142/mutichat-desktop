@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, session, nativeTheme, dialog, clipbo
 const path = require('path');
 const fs = require('fs');
 const { initMoviesBlocker } = require('./movie-adblock');
+const { setupMoviesGuard } = require('./movies-guard');
 
 // Enforce single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
@@ -115,11 +116,10 @@ function createWindow() {
 const CHROME_USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome.split('.')[0]}.0.0.0 Safari/537.36`;
 
 app.on('web-contents-created', (event, contents) => {
-  // Ctrl+Shift+Y / Ctrl+Shift+K toggle YouTube / TikTok even when a webview has keyboard focus
+  // Ctrl+Shift+Y / K / M toggle YouTube / TikTok / Movies even when a webview has keyboard focus
   contents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown' || !input.control) return;
-    // Ctrl+Shift+Y = YouTube, Ctrl+Shift+K = TikTok
-    const mediaToggle = input.shift && { y: 'toggle-youtube', k: 'toggle-tiktok' }[input.key.toLowerCase()];
+    const mediaToggle = input.shift && { y: 'toggle-youtube', k: 'toggle-tiktok', m: 'toggle-movies' }[input.key.toLowerCase()];
     if (mediaToggle) {
       e.preventDefault();
       if (mainWindow) mainWindow.webContents.send(mediaToggle);
@@ -144,12 +144,17 @@ app.on('web-contents-created', (event, contents) => {
 
   if (contents.getType() === 'webview') {
     contents.setUserAgent(CHROME_USER_AGENT);
-    
-    // Allow Facebook login popups/oauth within the same webview
-    contents.setWindowOpenHandler(({ url }) => {
-      contents.loadURL(url);
-      return { action: 'deny' };
+
+    const isMovies = setupMoviesGuard(contents, (url) => {
+      if (mainWindow) mainWindow.webContents.send('movies-nav-blocked', url);
     });
+    if (!isMovies) {
+      // Allow Facebook login popups/oauth within the same webview
+      contents.setWindowOpenHandler(({ url }) => {
+        contents.loadURL(url);
+        return { action: 'deny' };
+      });
+    }
   }
 });
 
