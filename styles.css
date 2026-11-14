@@ -923,6 +923,86 @@ webview {
   height: 100%;
 }
 
+/* Movies tab — ad-free browser in the floating view */
+.movies-btn i {
+  color: #f59e0b;
+}
+
+.movies-urlbar {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  max-width: 760px;
+  align-items: center;
+  gap: 4px;
+}
+
+.youtube-view[data-site="movies"] .movies-urlbar {
+  display: flex;
+}
+
+.youtube-view[data-site="movies"] #media-title {
+  display: none;
+}
+
+.movies-urlbar input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #e5e7eb;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.movies-urlbar input:focus {
+  border-color: #60a5fa;
+}
+
+#btn-movies-fav.active i {
+  color: #f59e0b;
+}
+
+#btn-movies-fav:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.movies-nav-blocked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #422006;
+  border-bottom: 1px solid #92400e;
+  color: #fde68a;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.movies-nav-blocked span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movies-nav-blocked .btn-secondary {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.movies-nav-blocked.hidden,
+.youtube-view.yt-mini .movies-nav-blocked,
+.youtube-view.yt-fullscreen .movies-nav-blocked {
+  display: none;
+}
+
 /* YouTube Mini Player — small, draggable, keeps playing while you chat */
 .youtube-view.yt-mini {
   position: fixed;

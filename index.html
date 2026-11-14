@@ -47,6 +47,10 @@
           <i class="fa-brands fa-tiktok"></i>
           <span>TikTok</span>
         </button>
+        <button id="btn-movies" class="action-btn media-btn movies-btn" title="เปิด/ซ่อน แท็บหนัง ไม่มีโฆษณา (Ctrl+Shift+M)">
+          <i class="fa-solid fa-film"></i>
+          <span>หนัง</span>
+        </button>
         <button id="btn-mode-grid" class="action-btn active" title="แสดงทุกบัญชีแบบแบ่งหน้าจอ (Grid View)">
           <i class="fa-solid fa-table-cells-large"></i>
           <span>แสดงแบ่งหน้าจอ</span>
@@ -78,10 +82,22 @@
             <button id="btn-yt-home" class="pane-btn" title="หน้าแรก"><i class="fa-solid fa-house"></i></button>
           </div>
           <span id="media-title" class="yt-title"><i class="fa-brands fa-youtube" style="color:#ef4444;"></i> YouTube ไม่มีโฆษณา</span>
+          <!-- Movies tab only: address bar + favourite -->
+          <form id="movies-urlbar" class="movies-urlbar">
+            <input id="movies-url-input" type="text" spellcheck="false" autocomplete="off" placeholder="พิมพ์ URL หรือคำค้นหา แล้วกด Enter">
+            <button id="btn-movies-fav" type="button" class="pane-btn" title="บันทึก / ลบ เว็บโปรด"><i class="fa-regular fa-star"></i></button>
+          </form>
           <div class="yt-nav">
             <button id="btn-yt-popout" class="pane-btn" title="ลอยนอกโปรแกรม (อยู่เหนือทุกแอป เหมือน Chrome)"><i class="fa-solid fa-up-right-from-square"></i></button>
             <button id="btn-yt-close" class="pane-btn danger" title="ปิด (คืน RAM ทั้งหมด)"><i class="fa-solid fa-xmark"></i></button>
           </div>
+        </div>
+        <!-- Movies tab: a page tried to take us to another site -->
+        <div id="movies-nav-blocked" class="movies-nav-blocked hidden">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>บล็อกไว้: เว็บพยายามพาไป <b id="movies-nav-blocked-host"></b></span>
+          <button id="btn-movies-nav-allow" type="button" class="btn-secondary">ไปต่อ</button>
+          <button id="btn-movies-nav-dismiss" type="button" class="pane-btn" title="ปิด"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div id="youtube-webview-host" class="youtube-webview-host"></div>
         <!-- Mini player overlay: webviews swallow mouse events, so drag/click is caught here -->
@@ -205,5 +221,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script src="renderer.js"></script>
+  <script src="movies.js"></script>
 </body>
 </html>

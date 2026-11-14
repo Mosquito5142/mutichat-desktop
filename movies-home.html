@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>เว็บโปรด</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 32px;
+      background: #0f172a;
+      color: #e5e7eb;
+      font-family: 'Prompt', 'Segoe UI', Tahoma, sans-serif;
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+    .hint { margin: 0 0 24px; color: #94a3b8; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .card {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: inherit;
+      text-decoration: none;
+    }
+    .card:hover { border-color: #f59e0b; }
+    .badge {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: #f59e0b;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      text-transform: uppercase;
+    }
+    .text { min-width: 0; }
+    .title, .host { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title { font-size: 14px; font-weight: 500; }
+    .host { font-size: 12px; color: #94a3b8; }
+    .remove {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 16px;
+      line-height: 22px;
+      cursor: pointer;
+      display: none;
+    }
+    .card:hover .remove { display: block; }
+    .remove:hover { background: #ef4444; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>🎬 เว็บโปรด</h1>
+  <p class="hint">พิมพ์ URL หรือคำค้นหาในแถบด้านบน แล้วกด ☆ เพื่อบันทึกเว็บไว้ที่นี่</p>
+  <div id="grid" class="grid"></div>
+  <script>
+    // Favourites come from the app (movies.js) in ?favs=; removing one sets #remove=<url>, which the app handles
+    let favs = [];
+    try { favs = JSON.parse(new URLSearchParams(location.search).get('favs')) || []; } catch (e) {}
+    const grid = document.getElementById('grid');
+    for (const fav of favs) {
+      let url;
+      try { url = new URL(fav.url); } catch (e) { continue; }
+      if (!/^https?:$/.test(url.protocol)) continue;
+      const host = url.hostname.replace(/^www\./, '');
+
+      const card = document.createElement('a');
+      card.className = 'card';
+      card.href = url.href;
+
+      const badge = document.createElement('div');
+      badge.className = 'badge';
+      badge.textContent = host.charAt(0);
+
+      const text = document.createElement('div');
+      text.className = 'text';
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = fav.title || host;
+      const hostEl = document.createElement('div');
+      hostEl.className = 'host';
+      hostEl.textContent = host;
+      text.append(title, hostEl);
+
+      const remove = document.createElement('button');
+      remove.className = 'remove';
+      remove.title = 'ลบออกจากเว็บโปรด';
+      remove.textContent = '×';
+      remove.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        location.hash = 'remove=' + encodeURIComponent(fav.url);
+      });
+
+      card.append(badge, text, remove);
+      grid.appendChild(card);
+    }
+  </script>
+</body>
+</html>

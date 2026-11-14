@@ -534,6 +534,11 @@ const MEDIA_SITES = {
   }
 };
 
+// Start / home page of a site (a site may build it on demand, e.g. the movies favourites page)
+function siteUrl(cfg) {
+  return typeof cfg.url === 'function' ? cfg.url() : cfg.url;
+}
+
 const mediaWebviews = {};    // site -> webview (only sites that are open)
 let activeSite = 'youtube';  // site shown in the floating view
 let ytWebview = null;        // webview of activeSite
@@ -612,12 +617,13 @@ async function popOutYoutube() {
 
 function createMediaWebview(site) {
   const cfg = MEDIA_SITES[site];
-  let startUrl = cfg.url;
+  let startUrl = siteUrl(cfg);
   try { startUrl = localStorage.getItem(cfg.lastUrlKey) || startUrl; } catch (e) {}
 
   const wv = document.createElement('webview');
   wv.setAttribute('partition', cfg.partition);
   wv.setAttribute('preload', MEDIA_PRELOAD_URL);
+  if (cfg.webpreferences) wv.setAttribute('webpreferences', cfg.webpreferences);
   wv.setAttribute('useragent', CHROME_USER_AGENT);
   wv.setAttribute('src', startUrl);
 
@@ -641,6 +647,7 @@ function createMediaWebview(site) {
   // Keep the "video only" layout across page loads while mini
   wv.addEventListener('dom-ready', () => { if (wv === ytWebview) broadcastToMedia(wv, 'mc-mini', ytMode === 'mini'); });
 
+  if (cfg.onCreate) cfg.onCreate(wv);
   youtubeHost.appendChild(wv);
   mediaWebviews[site] = wv;
   return wv;
@@ -657,6 +664,7 @@ function openMedia(site) {
   }
   const switching = site !== activeSite;
   activeSite = site;
+  youtubeView.dataset.site = site;
   ytWebview = mediaWebviews[site] || createMediaWebview(site);
   ytWebview.classList.remove('mc-media-hidden');
   mediaTitle.innerHTML = MEDIA_SITES[site].title;
@@ -730,7 +738,7 @@ function youtubeNav(action) {
   if (!ytWebview) return;
   if (action === 'back' && ytWebview.canGoBack()) ytWebview.goBack();
   else if (action === 'forward' && ytWebview.canGoForward()) ytWebview.goForward();
-  else if (action === 'home') ytWebview.loadURL(MEDIA_SITES[activeSite].url);
+  else if (action === 'home') ytWebview.loadURL(siteUrl(MEDIA_SITES[activeSite]));
 }
 
 // --- Mini player: drag anywhere, click to go back to full view ---
