@@ -17,9 +17,17 @@ function cachePath() {
   return path.join(app.getPath('userData'), 'adblock-engine.bin');
 }
 
+// Ghostery reads the body without checking the status: a 404 / 429 page must fail the build, not get cached
+function fetchOk(url, init) {
+  return fetch(url, init).then((res) => {
+    if (!res.ok) throw new Error(`${res.status} ${url}`);
+    return res;
+  });
+}
+
 // Download every list, compile, and cache the result for the next launch
 async function buildFromLists() {
-  const blocker = await ElectronBlocker.fromLists(fetch, FILTER_LISTS, { enableCompression: true });
+  const blocker = await ElectronBlocker.fromLists(fetchOk, FILTER_LISTS, { enableCompression: true });
   await fs.promises.writeFile(cachePath(), blocker.serialize());
   return blocker;
 }
@@ -42,15 +50,15 @@ async function loadCached() {
 function initMoviesBlocker() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const moviesSession = session.fromPartition(MOVIES_PARTITION);
-    const cached = await loadCached();
-    if (cached) {
-      cached.blocker.enableBlockingInSession(moviesSession);
-      // Fresh lists in the background; used from the next launch
-      if (cached.stale) buildFromLists().catch(() => {});
-      return { ok: true };
-    }
     try {
+      const moviesSession = session.fromPartition(MOVIES_PARTITION);
+      const cached = await loadCached();
+      if (cached) {
+        cached.blocker.enableBlockingInSession(moviesSession);
+        // Fresh lists in the background; used from the next launch
+        if (cached.stale) buildFromLists().catch(() => {});
+        return { ok: true };
+      }
       const blocker = await buildFromLists();
       blocker.enableBlockingInSession(moviesSession);
       return { ok: true };
