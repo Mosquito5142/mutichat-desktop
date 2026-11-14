@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, session, nativeTheme, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { initMoviesBlocker } = require('./movie-adblock');
 
 // Enforce single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
@@ -213,3 +214,6 @@ ipcMain.on('flash-taskbar', (event) => {
 });
 
 
+
+// Movies tab: start the ad blocker before its webview is created (no-op after the first call)
+ipcMain.handle('movies-init', () => initMoviesBlocker());
