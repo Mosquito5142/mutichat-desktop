@@ -570,36 +570,43 @@ function setYoutubeMode(mode) {
     youtubeView.style.width = '';
     youtubeView.style.height = '';
   }
-  sendToYoutube('mc-mini', mode === 'mini');
+  broadcastToMedia(ytWebview, 'mc-mini', mode === 'mini');
   updateMediaButtons();
 }
 
 // ===== Picture-in-Picture: Chromium's own floating video window (stays on top of every app, like Chrome) =====
-// __mcMainVideo() is defined by media-preload.js (YouTube player video, or the playing / largest video elsewhere)
-const PIP_VIDEO = `(window.__mcMainVideo ? window.__mcMainVideo() : document.querySelector('video'))`;
+// The clip may sit in a cross-origin iframe (movie sites), so the main process picks the frame
+// that holds it and runs the action there (media-frames.js).
+function mediaFrame(action, wv = ytWebview) {
+  if (!wv) return Promise.resolve(null);
+  let id;
+  try { id = wv.getWebContentsId(); } catch (e) { return Promise.resolve(null); } // not attached yet
+  return ipcRenderer.invoke('media-frame', id, action).catch(() => null);
+}
 
-async function enterPip() {
-  if (!ytWebview) return false;
+// Message to the preload in every frame of the page (webview.send only reaches the top frame)
+function broadcastToMedia(wv, channel, ...args) {
+  if (!wv) return;
   try {
-    // userGesture=true: Chromium only opens PiP in response to a user action
-    return await ytWebview.executeJavaScript(
-      `(() => { const v = ${PIP_VIDEO}; if (!v || !document.pictureInPictureEnabled) return false;
-        return v.requestPictureInPicture().then(() => true, () => false); })()`, true);
-  } catch (e) {
-    return false;
-  }
+    ipcRenderer.invoke('media-broadcast', wv.getWebContentsId(), channel, ...args).catch(() => {});
+  } catch (e) {} // not attached yet
+}
+
+// true = floating, false = PiP refused, 'no-video' = nothing to float
+function enterPip() {
+  return ytWebview ? mediaFrame('pip-enter') : Promise.resolve(false);
 }
 
 function exitPip(wv = ytWebview) {
-  if (!wv) return Promise.resolve();
-  return wv.executeJavaScript(
-    `document.pictureInPictureElement ? document.exitPictureInPicture().catch(() => {}) : null`).catch(() => {});
+  return mediaFrame('pip-exit', wv);
 }
 
 // Pop the clip out of the app on demand (button on the media bar / mini player)
 async function popOutYoutube() {
   if (!ytWebview) return;
-  if (await enterPip()) setYoutubeMode('pip');
+  const result = await enterPip();
+  if (result === true) setYoutubeMode('pip');
+  else if (result === 'no-video') showToast('ยังไม่เจอวิดีโอ กดเล่นก่อนแล้วลองใหม่');
   else showToast('เครื่องนี้เปิดหน้าต่างลอยไม่ได้ ใช้จอเล็กในโปรแกรมแทน');
 }
 
@@ -632,7 +639,7 @@ function createMediaWebview(site) {
   wv.addEventListener('enter-html-full-screen', () => youtubeView.classList.add('yt-fullscreen'));
   wv.addEventListener('leave-html-full-screen', () => youtubeView.classList.remove('yt-fullscreen'));
   // Keep the "video only" layout across page loads while mini
-  wv.addEventListener('dom-ready', () => { if (wv === ytWebview) sendToYoutube('mc-mini', ytMode === 'mini'); });
+  wv.addEventListener('dom-ready', () => { if (wv === ytWebview) broadcastToMedia(wv, 'mc-mini', ytMode === 'mini'); });
 
   youtubeHost.appendChild(wv);
   mediaWebviews[site] = wv;
@@ -644,8 +651,8 @@ function openMedia(site) {
   if (site !== activeSite && ytWebview) {
     const prev = ytWebview;
     exitPip(prev);
-    sendToYoutube('mc-pause');
-    sendToYoutube('mc-mini', false);
+    mediaFrame('pause', prev);
+    broadcastToMedia(prev, 'mc-mini', false);
     prev.classList.add('mc-media-hidden');
   }
   const switching = site !== activeSite;
@@ -662,11 +669,7 @@ function openYoutube() {
 }
 
 async function isPlayingVideo() {
-  try {
-    return await ytWebview.executeJavaScript(`(() => { const v = ${PIP_VIDEO}; return !!(v && !v.paused && !v.ended); })()`);
-  } catch (e) {
-    return false;
-  }
+  return (await mediaFrame('playing')) === true;
 }
 
 // Going to the chats: keep a playing clip in a floating window (in-app mini player if PiP fails),
@@ -677,13 +680,13 @@ async function leaveYoutube() {
   if (ytMode !== 'full' || ytLeaving) return;
   ytLeaving = true;
   const playing = await isPlayingVideo();
-  const inPip = playing && await enterPip();
+  const inPip = playing && (await enterPip()) === true;
   ytLeaving = false;
   if (ytMode !== 'full') return; // user already moved on (e.g. closed it)
   if (playing) {
     setYoutubeMode(inPip ? 'pip' : 'mini');
   } else {
-    sendToYoutube('mc-pause');
+    mediaFrame('pause');
     setYoutubeMode('hidden');
   }
 }
@@ -848,7 +851,7 @@ ytMiniOverlay.querySelectorAll('.yt-mini-resize').forEach((handle) => {
 });
 
 document.getElementById('btn-yt-mini-play').addEventListener('click', () => {
-  sendToYoutube('mc-toggle-play');
+  mediaFrame('toggle-play');
 });
 document.getElementById('btn-yt-mini-close').addEventListener('click', closeYoutube);
 

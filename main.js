@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { initMoviesBlocker } = require('./movie-adblock');
 const { setupMoviesGuard } = require('./movies-guard');
+const { runMediaAction, broadcastToFrames } = require('./media-frames');
 
 // Enforce single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
@@ -222,3 +223,7 @@ ipcMain.on('flash-taskbar', (event) => {
 
 // Movies tab: start the ad blocker before its webview is created (no-op after the first call)
 ipcMain.handle('movies-init', () => initMoviesBlocker());
+
+// Floating media view: PiP / play / pause in whichever frame holds the video (media-frames.js)
+ipcMain.handle('media-frame', (event, webContentsId, action) => runMediaAction(webContentsId, action));
+ipcMain.handle('media-broadcast', (event, webContentsId, channel, ...args) => broadcastToFrames(webContentsId, channel, args));
