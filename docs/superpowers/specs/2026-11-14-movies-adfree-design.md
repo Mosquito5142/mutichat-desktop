@@ -35,16 +35,17 @@
 - **lazy init:** `ipcMain.handle('movies-init')` สร้าง engine และเรียก `enableBlockingInSession` ตอนกดปุ่มหนังครั้งแรก renderer รอให้เสร็จก่อนสร้าง webview ถ้าเรียกซ้ำจะได้ promise เดิม
 - **cache:** engine ที่ serialize แล้วเก็บไว้ที่ `app.getPath('userData')/adblock-engine.bin` ถ้ามีจะโหลดจาก cache ทันที และถ้าไฟล์เก่ากว่า 7 วันจะโหลด list ใหม่อยู่เบื้องหลังแล้วเขียน cache ทับ (engine ใหม่ใช้ตั้งแต่เปิดครั้งถัดไป)
 - ไฟล์ cache อ่านไม่ได้หรือเสีย → ลบทิ้งแล้วโหลดจาก list ใหม่
-- **ความเสี่ยงที่ต้องตรวจก่อน:** ghostery ต้องรองรับ preload API ของ Electron 44 ถ้าไม่รองรับให้ใช้เฉพาะ network filter (`blocker.match` ใน `webRequest.onBeforeRequest`) และฉีด cosmetic CSS (`blocker.getCosmeticsFilters`) ผ่าน `media-preload.js` เอง
+- **ตรวจแล้ว:** `@ghostery/adblocker-electron@2.20.3` ใช้ `session.registerPreloadScript` (มีใน Electron 35+) จึงใช้กับ Electron 44 ได้ และ `fromLists` โหลด scriptlet resources ของ uBlock ให้เอง
 
 ### ชั้นที่ 3: ดักป๊อปอัปและ redirect (เขียนเอง)
 
 ใช้กับ webview guest ที่ session เป็น `persist:movies` (เช็กใน `web-contents-created` ของ `main.js`)
 
-- `setWindowOpenHandler`: ปฏิเสธทุกหน้าต่างใหม่ ถ้า URL เป็นเว็บเดียวกับหน้าปัจจุบัน (`isSameSite`) ให้โหลดในหน้าเดิม ถ้าไม่ใช่ทิ้งเงียบๆ
-- `will-navigate` (top frame เท่านั้น): ถ้าปลายทางเป็นคนละเว็บกับหน้าปัจจุบัน และไม่ได้มาจากแถบ URL / เว็บโปรด / ← → ให้ `preventDefault()` แล้วส่ง `movies-nav-blocked` (URL ปลายทาง) ไปที่ renderer
-  - renderer แสดงแถบ "เว็บพยายามพาไป xxx.com" พร้อมปุ่ม [ไปต่อ] (อนุญาตครั้งเดียว: main เก็บ URL นั้นไว้ใน allow-once set แล้ว renderer สั่ง `loadURL`) และ [ปิด] แถบหายเองใน 8 วินาที
-  - การ navigate ที่แอปสั่งเอง (แถบ URL, เว็บโปรด, ← →, 🏠) renderer ส่ง `movies-allow-nav` ก่อนทุกครั้ง
+- `setWindowOpenHandler`: ปฏิเสธทุกหน้าต่างใหม่ ถ้า URL เป็นเว็บเดียวกับหน้าปัจจุบัน (`isSameSite`) และไม่ใช่หน้าเดิม ให้โหลดในหน้าเดิม ถ้าเป็นหน้าเดิม (มุก popunder ที่เปิดหน้าตัวเองซ้ำ) หรือคนละเว็บให้ทิ้งเงียบๆ
+- `will-navigate` (top frame เท่านั้น): ถ้าปลายทางเป็นคนละเว็บกับหน้าปัจจุบัน ให้ `preventDefault()` แล้วส่ง `movies-nav-blocked` (URL ปลายทาง) ไปที่ renderer
+  - `will-navigate` ไม่ยิงตอนแอปสั่งเอง (`loadURL`, back/forward) แถบ URL, เว็บโปรด, ← → และ 🏠 จึงไม่โดนบล็อกโดยไม่ต้องมีกลไกอนุญาตเพิ่ม
+  - ยกเว้นเมื่อหน้าปัจจุบันไม่ใช่ http(s) (หน้าเว็บโปรด) หรือเป็นเว็บค้นหา (Google, Bing, DuckDuckGo) เพื่อให้กดผลค้นหาไปเว็บหนังได้ (`isGuardExempt`)
+  - renderer แสดงแถบ "เว็บพยายามพาไป xxx.com" พร้อมปุ่ม [ไปต่อ] (สั่ง `loadURL` ซึ่งไม่ผ่าน `will-navigate`) และ [ปิด] แถบหายเองใน 8 วินาที ถ้าตอนนั้นไม่ได้ดูแท็บหนังแบบเต็ม ให้บล็อกเงียบๆ
 - การเปลี่ยนหน้าภายใน iframe ไม่บล็อก (ตัวเล่นเปลี่ยน source ของตัวเองบ่อย)
 
 ## 3. จอลอยจาก iframe
@@ -64,6 +65,7 @@
 - webview หนังตั้ง `webpreferences="nodeIntegrationInSubFrames"` ให้ `media-preload.js` รันในทุกเฟรม iframe ตัวเล่นจึงได้ปุ่มกรอ ±10 วินาที และ "กลับไปที่แท็บ" ใน PiP เหมือน YouTube
 - preload ยังรันใน isolated world และไม่ส่ง `ipcRenderer` ให้สคริปต์ของเว็บ
 - ข้อความจาก iframe (`mc-pip-return`, `mc-pip-closed`) ส่งด้วย `ipcRenderer.sendToHost` เหมือนเดิม
+- `webview.send()` ส่งถึงแค่ top frame จึงเปลี่ยน `mc-mini` ไปส่งผ่าน `ipcMain.handle('media-broadcast')` ที่ `frame.send()` ทุกเฟรม ส่วน `mc-pause` / `mc-toggle-play` เปลี่ยนเป็น action ของ `media-frame` (`mc-notify` ยังส่งแค่ top frame เหมือนเดิม)
 
 ### mini player เห็นแค่วิดีโอ
 
@@ -91,7 +93,8 @@
 `movies-util.js` (ใช้ได้ทั้ง main และ renderer ไม่มี dependency ของ Electron):
 
 - `normalizeInput(text)` → URL ที่จะเปิด
-- `isSameSite(urlA, urlB)` ใช้ `tldts.getDomain` (มากับ ghostery อยู่แล้ว) ไม่ใช่ http(s) → `false`
+- `isSameSite(urlA, urlB)` ใช้ `tldts.parse(...).domain` (เพิ่ม `tldts` เป็น dependency ตรง ghostery ใช้ `tldts-experimental` ซึ่งไม่ควรพึ่ง) ไม่ใช่ http(s) → `false`
+- `isGuardExempt(url)`: ไม่ใช่ http(s) หรือเป็นเว็บค้นหา → `true`
 - `pickBestFrame(probes)` → index ของเฟรม หรือ `null`
 
 ## 6. การทดสอบ
