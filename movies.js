@@ -47,7 +47,12 @@ function isMoviesHome(url) {
 function favoriteRemovalRequest(url) {
   if (!isMoviesHome(url)) return null;
   const hash = new URL(url).hash;
-  return hash.startsWith('#remove=') ? decodeURIComponent(hash.slice('#remove='.length)) : null;
+  if (!hash.startsWith('#remove=')) return null;
+  try {
+    return decodeURIComponent(hash.slice('#remove='.length));
+  } catch (e) {
+    return null; // malformed escape sequence
+  }
 }
 
 function moviesWebview() {
@@ -122,6 +127,8 @@ document.getElementById('btn-movies-nav-allow').addEventListener('click', () => 
   const wv = moviesWebview();
   const url = moviesBlockedUrl;
   hideMoviesNavBlocked();
+  // Only act while the movies tab is on screen full size (the bar can outlive a site switch)
+  if (activeSite !== 'movies' || ytMode !== 'full') return;
   // loadURL never goes through the guard's will-navigate
   if (wv && url) wv.loadURL(url).catch(() => {});
 });
@@ -149,22 +156,36 @@ function attachMoviesWebview(wv) {
 function ensureMoviesBlocker() {
   if (!moviesReady) {
     showToast('กำลังเตรียมตัวบล็อกโฆษณา...');
-    moviesReady = Promise.race([
-      ipcRenderer.invoke('movies-init').catch(() => ({ ok: false })),
-      // Slow network: open the page anyway, blocking switches on as soon as the engine is ready
-      new Promise((resolve) => setTimeout(() => resolve({ ok: true }), MOVIES_INIT_TIMEOUT_MS))
-    ]).then((result) => {
+    // Always handled, even if it settles after the timeout below
+    const init = ipcRenderer.invoke('movies-init').catch(() => ({ ok: false })).then((result) => {
       if (!result || !result.ok) {
         moviesReady = null; // try again next time the tab opens
         showToast('ยังโหลดตัวบล็อกโฆษณาไม่ได้ จะลองใหม่รอบหน้า');
       }
+      return result;
     });
+    let timer;
+    // Slow network: open the page anyway, blocking switches on as soon as the engine is ready
+    const timeout = new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ ok: true }), MOVIES_INIT_TIMEOUT_MS);
+    });
+    moviesReady = Promise.race([init, timeout]).then(() => clearTimeout(timer));
   }
   return moviesReady;
 }
 
+let moviesOpening = false;
+
 async function toggleMovies() {
-  if (!mediaWebviews.movies) await ensureMoviesBlocker();
+  if (moviesOpening) return; // a first open is already waiting on the blocker
+  if (!mediaWebviews.movies) {
+    moviesOpening = true;
+    try {
+      await ensureMoviesBlocker();
+    } finally {
+      moviesOpening = false;
+    }
+  }
   toggleMedia('movies');
 }
 

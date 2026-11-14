@@ -717,6 +717,8 @@ async function closeYoutube() {
         if (time > 5) url.searchParams.set('t', `${Math.floor(time)}s`);
       }
       localStorage.setItem(cfg.lastUrlKey, url.href);
+    } else {
+      localStorage.removeItem(cfg.lastUrlKey); // not a web page (e.g. favourites): don't reopen an older site
     }
   } catch (e) {}
 

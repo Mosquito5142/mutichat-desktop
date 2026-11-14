@@ -998,6 +998,7 @@ webview {
 }
 
 .movies-nav-blocked.hidden,
+.youtube-view:not([data-site="movies"]) .movies-nav-blocked,
 .youtube-view.yt-mini .movies-nav-blocked,
 .youtube-view.yt-fullscreen .movies-nav-blocked {
   display: none;
