@@ -248,11 +248,33 @@ const COMMON_CSS = `
   }
 `;
 
+// Other sites (movies tab): the mini player shows only the biggest video / player iframe of each frame
+const GENERIC_MINI_CSS = `
+  html.mc-mini, html.mc-mini body {
+    overflow: hidden !important;
+  }
+  html.mc-mini [data-mc-mini-target] {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    z-index: 2147483646 !important;
+    background: #000 !important;
+    object-fit: contain !important;
+  }
+`;
+const IS_OTHER_SITE = !IS_YOUTUBE && !IS_TIKTOK;
+
 webFrame.executeJavaScript(MAIN_WORLD_CODE);
 
 window.addEventListener('DOMContentLoaded', () => {
   webFrame.insertCSS(COMMON_CSS);
   if (IS_YOUTUBE) webFrame.insertCSS(YOUTUBE_CSS);
+  if (IS_OTHER_SITE) webFrame.insertCSS(GENERIC_MINI_CSS);
 });
 
 // ===== Messages from the Multi-Chat host =====
@@ -309,25 +331,28 @@ ipcRenderer.on('mc-notify', (_event, info) => {
   card._mcTimer = setTimeout(() => removeCard(card), CARD_LIFETIME_MS);
 });
 
+// Biggest <video> / <iframe> in this frame: the player (or the iframe holding it)
+function markMiniTarget(on) {
+  document.querySelectorAll('[data-mc-mini-target]').forEach((el) => el.removeAttribute('data-mc-mini-target'));
+  if (!on) return;
+  let best = null;
+  let bestArea = 0;
+  for (const el of document.querySelectorAll('video, iframe')) {
+    const r = el.getBoundingClientRect();
+    if (r.width * r.height > bestArea) { best = el; bestArea = r.width * r.height; }
+  }
+  if (best) best.setAttribute('data-mc-mini-target', '');
+}
+
+// Sent to every frame (media-broadcast); play / pause / PiP run from the main process (media-frames.js)
 ipcRenderer.on('mc-mini', (_event, on) => {
   document.documentElement.classList.toggle('mc-mini', !!on);
+  if (IS_OTHER_SITE) markMiniTarget(!!on);
   // Let the player recompute its size for the new layout
   window.dispatchEvent(new Event('resize'));
-});
-
-ipcRenderer.on('mc-toggle-play', () => {
-  const video = mainVideo();
-  if (!video) return;
-  if (video.paused) video.play().catch(() => {});
-  else video.pause();
 });
 
 // Leaving the PiP window: Chromium keeps playing for "back to tab" and pauses when it is closed
 document.addEventListener('leavepictureinpicture', (e) => {
   ipcRenderer.sendToHost(e.target.paused ? 'mc-pip-closed' : 'mc-pip-return');
 }, true);
-
-ipcRenderer.on('mc-pause', () => {
-  const video = mainVideo();
-  if (video && !video.paused) video.pause();
-});
